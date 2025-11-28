@@ -73,6 +73,13 @@ class AssertConfig:
     headers: dict[str, str] = field(default_factory=dict)
 
 @dataclass
+class LoopConfig:
+    count: Optional[int] = None           # Fixed iteration count
+    while_condition: Optional[str] = None # JSONPath condition (e.g., "$.status != 'finished'")
+    max_iterations: int = 100             # Safety limit for while loops
+    interval: Optional[int] = None        # Delay between iterations (ms)
+
+@dataclass
 class ScenarioStep:
     name: str
     endpoint: str                       # Raw endpoint value from YAML
@@ -85,6 +92,7 @@ class ScenarioStep:
     payload: Optional[dict[str, Any]] = None
     captures: list[CaptureConfig] = field(default_factory=list)
     assertions: Optional[AssertConfig] = None
+    loop: Optional[LoopConfig] = None         # Loop control configuration
 
 @dataclass
 class ParsedScenario:
@@ -471,13 +479,13 @@ class ScenarioVisualizer:
     def visualize(
         self,
         scenario: ParsedScenario,
-        endpoint_info: Optional[dict[str, dict]] = None
+        correlation_result: Optional[CorrelationResult] = None,
     ) -> None:
         """Display scenario visualization in terminal.
 
         Args:
             scenario: Parsed scenario to visualize
-            endpoint_info: Optional dict mapping endpoint to method/path info
+            correlation_result: Optional correlation analysis result for variable flows
         """
 
     def _render_step(self, step: ScenarioStep, index: int) -> Panel:
@@ -654,26 +662,21 @@ class ScenarioJMXGenerator:
         ```
         """
 
-    def _create_response_assertion(
+    def _create_response_assertions(
         self,
         assertions: AssertConfig
-    ) -> ET.Element:
-        """Create ResponseAssertion element.
+    ) -> list[ET.Element]:
+        """Create assertion elements from AssertConfig.
+
+        Creates both ResponseAssertion (status) and JSONPathAssertion (body).
+        Returns list of all assertion elements.
 
         Supports:
-        - Status code assertion
-        - Body field assertions (JSONPath-based)
+        - Status code assertion (ResponseAssertion)
+        - Body field assertions (JSONPathAssertion for each field)
         - Header assertions
-        """
 
-    def _create_body_assertion(
-        self,
-        field: str,
-        expected_value: Any
-    ) -> ET.Element:
-        """Create JSONPathAssertion for body field.
-
-        JMX Structure:
+        JMX Structure for body assertions:
         ```xml
         <JSONPathAssertion guiclass="JSONPathAssertionGui"
                           testclass="JSONPathAssertion"

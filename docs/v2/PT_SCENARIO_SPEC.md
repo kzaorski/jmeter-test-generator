@@ -122,7 +122,7 @@ Each step in the `scenario` array has the following structure:
 | `capture` | array | No | Variables to extract from response |
 | `assert` | object | No | Response assertions |
 | `condition` | object | No | Conditional execution (planned) |
-| `loop` | object | No | Loop control (planned) |
+| `loop` | object | No | Loop control (count, while) |
 
 ### Endpoint Format
 
@@ -307,17 +307,31 @@ condition:
 
 ---
 
-## Loop Syntax (planned)
+## Loop Syntax
+
+Loop control allows repeating a step multiple times.
 
 ### Fixed Count Loop
 
 ```yaml
 loop:
-  count: 5
-  variable: "i"               # ${i} = 1, 2, 3, 4, 5
+  count: 5                    # Repeat step 5 times
+  interval: 1000              # Optional: delay between iterations (ms)
 ```
 
-### Foreach Loop
+### While Loop (condition-based)
+
+```yaml
+loop:
+  while: "$.status != 'finished'"   # JSONPath condition
+  max_iterations: 100               # Safety limit (default: 100)
+  interval: 5000                    # Optional: delay between iterations (ms)
+```
+
+The while loop continues until the condition evaluates to false or max_iterations is reached.
+The condition uses JSONPath syntax to check values from the response.
+
+### Foreach Loop (planned)
 
 ```yaml
 loop:
@@ -325,13 +339,7 @@ loop:
   variable: "currentPetId"    # ${currentPetId} = current value
 ```
 
-### While Loop
-
-```yaml
-loop:
-  while: "${hasMore} == true"
-  max: 100                    # Safety limit
-```
+Note: Foreach loops are not yet implemented.
 
 ---
 
