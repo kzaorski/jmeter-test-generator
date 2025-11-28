@@ -887,3 +887,252 @@ paths:
         """Test condition extractor returns None for invalid condition."""
         extractor = generator._create_condition_extractor("invalid condition without jsonpath")
         assert extractor is None
+
+
+class TestTransactionControllerGeneration:
+    """Tests for Transaction Controller JMX generation."""
+
+    @pytest.fixture
+    def parser(self, tmp_path):
+        """Create a parser instance."""
+        spec_content = """openapi: 3.0.0
+info:
+  title: Test API
+  version: 1.0.0
+paths:
+  /users:
+    get:
+      operationId: getUsers
+      responses:
+        '200':
+          description: OK
+    post:
+      operationId: createUser
+      responses:
+        '201':
+          description: Created
+  /status:
+    get:
+      operationId: getStatus
+      responses:
+        '200':
+          description: OK
+"""
+        spec_path = tmp_path / "spec.yaml"
+        spec_path.write_text(spec_content)
+        parser = OpenAPIParser()
+        parser.parse(str(spec_path))
+        return parser
+
+    @pytest.fixture
+    def generator(self, parser):
+        """Create a generator instance."""
+        return ScenarioJMXGenerator(parser)
+
+    def test_create_transaction_controller_default(self, generator):
+        """Test Transaction Controller creation with default properties."""
+        tc = generator._create_transaction_controller("Test Transaction")
+
+        assert tc.tag == "TransactionController"
+        assert tc.get("guiclass") == "TransactionControllerGui"
+        assert tc.get("testclass") == "TransactionController"
+        assert tc.get("testname") == "Test Transaction"
+        assert tc.get("enabled") == "true"
+
+        # Check default properties
+        include_timers = tc.find(".//boolProp[@name='TransactionController.includeTimers']")
+        assert include_timers is not None
+        assert include_timers.text == "false"
+
+        parent_prop = tc.find(".//boolProp[@name='TransactionController.parent']")
+        assert parent_prop is not None
+        assert parent_prop.text == "true"
+
+    def test_create_transaction_controller_custom_props(self, generator):
+        """Test Transaction Controller with custom properties."""
+        tc = generator._create_transaction_controller(
+            "Custom TC",
+            include_timers=True,
+            generate_parent_sample=False
+        )
+
+        include_timers = tc.find(".//boolProp[@name='TransactionController.includeTimers']")
+        assert include_timers.text == "true"
+
+        parent_prop = tc.find(".//boolProp[@name='TransactionController.parent']")
+        assert parent_prop.text == "false"
+
+    def test_step_wrapped_in_transaction_controller(self, generator, tmp_path):
+        """Test that each step is wrapped in a Transaction Controller."""
+        scenario = ParsedScenario(
+            version="1.0",
+            name="TC Test",
+            description=None,
+            settings=ScenarioSettings(base_url="http://localhost:8000"),
+            variables={},
+            steps=[
+                ScenarioStep(
+                    name="Get Users",
+                    endpoint="GET /users",
+                    endpoint_type="method_path",
+                    method="GET",
+                    path="/users",
+                ),
+                ScenarioStep(
+                    name="Create User",
+                    endpoint="POST /users",
+                    endpoint_type="method_path",
+                    method="POST",
+                    path="/users",
+                ),
+            ],
+        )
+
+        output_path = tmp_path / "tc_test.jmx"
+
+        result = generator.generate(
+            scenario=scenario,
+            output_path=str(output_path),
+        )
+
+        assert result["success"] is True
+        assert result["transactions_created"] == 2
+
+        tree = ET.parse(output_path)
+        root = tree.getroot()
+
+        # Find all Transaction Controllers
+        tcs = root.findall(".//TransactionController")
+        assert len(tcs) == 2
+
+        # Check naming pattern
+        tc_names = [tc.get("testname") for tc in tcs]
+        assert "Step 1: Get Users" in tc_names
+        assert "Step 2: Create User" in tc_names
+
+    def test_loop_with_transaction_controller(self, generator, tmp_path):
+        """Test that Transaction Controller is inside LoopController."""
+        scenario = ParsedScenario(
+            version="1.0",
+            name="Loop TC Test",
+            description=None,
+            settings=ScenarioSettings(base_url="http://localhost:8000"),
+            variables={},
+            steps=[
+                ScenarioStep(
+                    name="Poll Status",
+                    endpoint="GET /status",
+                    endpoint_type="method_path",
+                    method="GET",
+                    path="/status",
+                    loop=LoopConfig(count=5),
+                ),
+            ],
+        )
+
+        output_path = tmp_path / "loop_tc.jmx"
+
+        result = generator.generate(
+            scenario=scenario,
+            output_path=str(output_path),
+        )
+
+        assert result["success"] is True
+        assert result["loops_created"] == 1
+        assert result["transactions_created"] == 1
+
+        tree = ET.parse(output_path)
+        root = tree.getroot()
+
+        # Both LoopController and TransactionController should exist
+        loop_controllers = root.findall(".//LoopController[@testclass='LoopController']")
+        assert len(loop_controllers) >= 1
+
+        tcs = root.findall(".//TransactionController")
+        assert len(tcs) == 1
+
+    def test_transaction_controller_naming(self, generator, tmp_path):
+        """Test Transaction Controller naming format."""
+        scenario = ParsedScenario(
+            version="1.0",
+            name="Naming Test",
+            description=None,
+            settings=ScenarioSettings(base_url="http://localhost:8000"),
+            variables={},
+            steps=[
+                ScenarioStep(
+                    name="First Step",
+                    endpoint="GET /users",
+                    endpoint_type="method_path",
+                    method="GET",
+                    path="/users",
+                ),
+                ScenarioStep(
+                    name="Second Step",
+                    endpoint="GET /status",
+                    endpoint_type="method_path",
+                    method="GET",
+                    path="/status",
+                ),
+                ScenarioStep(
+                    name="Third Step",
+                    endpoint="POST /users",
+                    endpoint_type="method_path",
+                    method="POST",
+                    path="/users",
+                ),
+            ],
+        )
+
+        output_path = tmp_path / "naming_test.jmx"
+
+        result = generator.generate(
+            scenario=scenario,
+            output_path=str(output_path),
+        )
+
+        tree = ET.parse(output_path)
+        root = tree.getroot()
+
+        tcs = root.findall(".//TransactionController")
+        tc_names = [tc.get("testname") for tc in tcs]
+
+        # Verify naming pattern: "Step N: {step.name}"
+        assert "Step 1: First Step" in tc_names
+        assert "Step 2: Second Step" in tc_names
+        assert "Step 3: Third Step" in tc_names
+
+    def test_transaction_controller_contains_sampler(self, generator, tmp_path):
+        """Test that HTTP sampler is inside Transaction Controller hashTree."""
+        scenario = ParsedScenario(
+            version="1.0",
+            name="Hierarchy Test",
+            description=None,
+            settings=ScenarioSettings(base_url="http://localhost:8000"),
+            variables={},
+            steps=[
+                ScenarioStep(
+                    name="Get Users",
+                    endpoint="GET /users",
+                    endpoint_type="method_path",
+                    method="GET",
+                    path="/users",
+                ),
+            ],
+        )
+
+        output_path = tmp_path / "hierarchy_test.jmx"
+
+        generator.generate(
+            scenario=scenario,
+            output_path=str(output_path),
+        )
+
+        # Read raw XML to verify hierarchy
+        content = output_path.read_text()
+
+        # TransactionController should appear before HTTPSamplerProxy
+        tc_pos = content.find("TransactionController")
+        sampler_pos = content.find("HTTPSamplerProxy")
+
+        assert tc_pos < sampler_pos, "TransactionController should appear before HTTPSamplerProxy"

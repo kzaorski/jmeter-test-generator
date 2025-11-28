@@ -14,6 +14,7 @@ Prioritized list of planned extensions for JMeter Test Generator.
 | MCP Server Integration | Full CLI-MCP parity with 5 tools |
 | Loop Support | count and while loops with interval |
 | Output folder prompt | Prompt for output folder when generating JMX (default: current directory) |
+| Transaction Controllers | Group samplers into logical transactions for aggregated metrics |
 
 ---
 

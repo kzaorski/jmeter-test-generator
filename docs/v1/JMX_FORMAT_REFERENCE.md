@@ -262,6 +262,74 @@ Defines the load profile (number of users, ramp-up, duration).
 - **scheduler**: When enabled, allows duration-based testing
 - **duration**: Total test execution time (e.g., 60 seconds)
 
+### TransactionController
+
+Groups samplers into logical transactions for aggregated metrics. Each transaction appears as a separate entry in JMeter results, enabling per-transaction response time measurement.
+
+```xml
+<TransactionController guiclass="TransactionControllerGui" testclass="TransactionController" testname="Create User Transaction" enabled="true">
+  <boolProp name="TransactionController.includeTimers">false</boolProp>
+  <boolProp name="TransactionController.parent">true</boolProp>
+</TransactionController>
+<hashTree>
+  <!-- Child samplers go here -->
+  <HTTPSamplerProxy testname="POST /users" ...>
+    <!-- Sampler properties -->
+  </HTTPSamplerProxy>
+  <hashTree>
+    <!-- Sampler children (assertions, extractors) -->
+  </hashTree>
+</hashTree>
+```
+
+**Key Properties:**
+- `TransactionController.includeTimers`: Include timer delays in transaction time (default: false)
+- `TransactionController.parent`: Generate parent sample in results (default: true)
+  - When `true`: Transaction appears as a sampler in results with aggregated metrics
+  - When `false`: Only child samplers appear in results, transaction is invisible
+
+**Use Cases:**
+- Group related requests (e.g., login flow: authenticate + get profile)
+- Measure business transaction response times
+- Create hierarchical test plans for better organization
+
+**Hierarchy Example:**
+```
+ThreadGroup
+  |-- TransactionController "User Registration"
+  |   |-- HTTPSampler "POST /users"
+  |   |-- HTTPSampler "GET /users/{id}"
+  |
+  |-- TransactionController "User Login"
+      |-- HTTPSampler "POST /auth/login"
+```
+
+**Python Example:**
+```python
+def create_transaction_controller(name, include_timers=False, generate_parent=True):
+    """Create Transaction Controller element."""
+    controller = ET.Element(
+        "TransactionController",
+        {
+            "guiclass": "TransactionControllerGui",
+            "testclass": "TransactionController",
+            "testname": name,
+            "enabled": "true",
+        },
+    )
+    ET.SubElement(
+        controller,
+        "boolProp",
+        {"name": "TransactionController.includeTimers"},
+    ).text = str(include_timers).lower()
+    ET.SubElement(
+        controller,
+        "boolProp",
+        {"name": "TransactionController.parent"},
+    ).text = str(generate_parent).lower()
+    return controller
+```
+
 ### ConfigTestElement (HTTP Request Defaults)
 
 **IMPORTANT**: Use HTTP Request Defaults to centralize server configuration. This allows users to override the base URL for different environments (dev/staging/prod) without modifying individual samplers.

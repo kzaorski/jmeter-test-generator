@@ -59,7 +59,7 @@ class TestCLI:
         result = runner.invoke(cli, ["--version"])
 
         assert result.exit_code == 0
-        assert "2.1.0" in result.output
+        assert "2.1.1" in result.output
 
 
 class TestAnalyzeCommand:

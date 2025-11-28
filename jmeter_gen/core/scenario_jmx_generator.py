@@ -76,6 +76,7 @@ class ScenarioJMXGenerator:
                 "extractors_created": int,
                 "assertions_created": int,
                 "loops_created": int,
+                "transactions_created": int,
                 "correlation_warnings": list[str],
                 "correlation_errors": list[str]
             }
@@ -152,6 +153,7 @@ class ScenarioJMXGenerator:
             extractors_created = 0
             assertions_created = 0
             loops_created = 0
+            transactions_created = 0
 
             for step_index, step in enumerate(scenario.steps, start=1):
                 if not step.enabled:
@@ -163,7 +165,7 @@ class ScenarioJMXGenerator:
                 # Resolve endpoint to get full path info
                 endpoint_data = self._resolve_endpoint(step)
 
-                # Determine where to add the sampler (directly to thread group or inside loop controller)
+                # Determine where to add the transaction controller
                 if step.loop:
                     # Create loop controller and add it to thread group
                     if step.loop.count:
@@ -181,19 +183,26 @@ class ScenarioJMXGenerator:
                     loop_hashtree = ET.SubElement(thread_group_hashtree, "hashTree")
                     loops_created += 1
 
-                    # Sampler goes inside loop controller
-                    parent_hashtree = loop_hashtree
+                    # Transaction controller goes inside loop controller
+                    tc_parent = loop_hashtree
                 else:
-                    # No loop - sampler goes directly in thread group
-                    parent_hashtree = thread_group_hashtree
+                    # No loop - transaction controller goes directly in thread group
+                    tc_parent = thread_group_hashtree
 
-                # Create HTTP Sampler
+                # Wrap step in Transaction Controller for aggregated metrics
+                tc_name = f"Step {step_index}: {step.name}"
+                transaction_controller = self._create_transaction_controller(tc_name)
+                tc_parent.append(transaction_controller)
+                tc_hashtree = ET.SubElement(tc_parent, "hashTree")
+                transactions_created += 1
+
+                # Create HTTP Sampler inside Transaction Controller
                 sampler = self._create_step_sampler(step, endpoint_data, step_index)
-                parent_hashtree.append(sampler)
+                tc_hashtree.append(sampler)
                 samplers_created += 1
 
                 # Sampler hashTree for children
-                sampler_hashtree = ET.SubElement(parent_hashtree, "hashTree")
+                sampler_hashtree = ET.SubElement(tc_hashtree, "hashTree")
 
                 # Add Header Manager if headers present
                 if step.headers:
@@ -243,6 +252,7 @@ class ScenarioJMXGenerator:
                 "extractors_created": extractors_created,
                 "assertions_created": assertions_created,
                 "loops_created": loops_created,
+                "transactions_created": transactions_created,
                 "correlation_warnings": correlation_result.warnings if correlation_result else [],
                 "correlation_errors": correlation_result.errors if correlation_result else [],
             }
@@ -749,7 +759,48 @@ class ScenarioJMXGenerator:
 
         return listener
 
-    # === Loop Controller Methods ===
+    # === Controller Methods ===
+
+    def _create_transaction_controller(
+        self,
+        name: str,
+        include_timers: bool = False,
+        generate_parent_sample: bool = True,
+    ) -> ET.Element:
+        """Create Transaction Controller element.
+
+        Transaction Controllers group samplers into logical transactions,
+        enabling aggregated metrics per transaction in JMeter results.
+
+        Args:
+            name: Display name for the transaction
+            include_timers: Include timer delays in transaction time (default: False)
+            generate_parent_sample: Generate parent sample in results (default: True)
+
+        Returns:
+            TransactionController XML Element
+        """
+        controller = ET.Element(
+            "TransactionController",
+            {
+                "guiclass": "TransactionControllerGui",
+                "testclass": "TransactionController",
+                "testname": name,
+                "enabled": "true",
+            },
+        )
+        ET.SubElement(
+            controller,
+            "boolProp",
+            {"name": "TransactionController.includeTimers"},
+        ).text = str(include_timers).lower()
+        ET.SubElement(
+            controller,
+            "boolProp",
+            {"name": "TransactionController.parent"},
+        ).text = str(generate_parent_sample).lower()
+
+        return controller
 
     def _create_loop_controller(self, name: str, count: int) -> ET.Element:
         """Create LoopController element for fixed count loops.
