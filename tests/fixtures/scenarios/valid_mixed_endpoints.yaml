@@ -1,0 +1,36 @@
+version: "1.0"
+name: "Mixed Endpoint Formats"
+description: "Combination of operationId and METHOD /path formats"
+
+scenario:
+  - name: "Create User"
+    endpoint: "createUser"
+    payload:
+      email: "test@example.com"
+    capture:
+      - userId
+    assert:
+      status: 201
+
+  - name: "Get User"
+    endpoint: "GET /users/{userId}"
+    params:
+      userId: "${userId}"
+    assert:
+      status: 200
+
+  - name: "Update User"
+    endpoint: "updateUser"
+    params:
+      userId: "${userId}"
+    payload:
+      firstName: "Updated"
+    assert:
+      status: 200
+
+  - name: "Delete User"
+    endpoint: "DELETE /users/{userId}"
+    params:
+      userId: "${userId}"
+    assert:
+      status: 200

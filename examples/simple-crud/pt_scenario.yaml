@@ -1,0 +1,54 @@
+version: "1.0"
+name: "User Management Flow"
+description: "Create, read, update, and delete a user"
+
+settings:
+  threads: 1
+  rampup: 0
+  base_url: "http://localhost:3000"
+
+variables:
+  test_email: "testuser@example.com"
+  test_password: "SecurePassword123"
+
+scenario:
+  - name: "Create new user"
+    endpoint: "POST /users"
+    headers:
+      Content-Type: "application/json"
+    payload:
+      email: "${test_email}"
+      password: "${test_password}"
+      name: "Test User"
+    capture:
+      - userId: "id"
+      - userName: "name"
+    assert:
+      status: 201
+
+  - name: "Get user by ID"
+    endpoint: "GET /users/${userId}"
+    assert:
+      status: 200
+      body:
+        email: "${test_email}"
+        name: "Test User"
+
+  - name: "Update user"
+    endpoint: "PUT /users/${userId}"
+    headers:
+      Content-Type: "application/json"
+    payload:
+      name: "Updated User"
+    assert:
+      status: 200
+
+  - name: "List all users"
+    endpoint: "GET /users"
+    assert:
+      status: 200
+
+  - name: "Delete user"
+    endpoint: "DELETE /users/${userId}"
+    assert:
+      status: 204

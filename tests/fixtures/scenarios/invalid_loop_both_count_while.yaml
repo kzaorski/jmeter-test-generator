@@ -1,0 +1,10 @@
+version: "1.0"
+name: "Invalid Loop - Both count and while"
+description: "Invalid: cannot have both count and while"
+
+scenario:
+  - name: "Invalid loop"
+    endpoint: "GET /status"
+    loop:
+      count: 10
+      while: "$.status != 'finished'"

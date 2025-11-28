@@ -1,0 +1,42 @@
+version: "1.0"
+name: "METHOD /path Format Only"
+description: "All endpoints use METHOD /path format"
+
+scenario:
+  - name: "List Users"
+    endpoint: "GET /users"
+    assert:
+      status: 200
+
+  - name: "Create User"
+    endpoint: "POST /users"
+    payload:
+      email: "test@example.com"
+      firstName: "Test"
+    capture:
+      - userId
+    assert:
+      status: 201
+
+  - name: "Get User"
+    endpoint: "GET /users/{userId}"
+    params:
+      userId: "${userId}"
+    assert:
+      status: 200
+
+  - name: "Update User"
+    endpoint: "PUT /users/{userId}"
+    params:
+      userId: "${userId}"
+    payload:
+      firstName: "Updated"
+    assert:
+      status: 200
+
+  - name: "Delete User"
+    endpoint: "DELETE /users/{userId}"
+    params:
+      userId: "${userId}"
+    assert:
+      status: 200

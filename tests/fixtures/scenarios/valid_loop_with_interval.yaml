@@ -1,0 +1,10 @@
+version: "1.0"
+name: "Loop with Interval"
+description: "Test scenario with loop interval only"
+
+scenario:
+  - name: "Repeated request"
+    endpoint: "GET /health"
+    loop:
+      count: 5
+      interval: 1000

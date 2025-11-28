@@ -1,0 +1,44 @@
+version: "1.0"
+name: "Capture Syntax Examples"
+description: "Tests all three capture syntaxes"
+
+scenario:
+  - name: "Create Order"
+    endpoint: "createOrder"
+    payload:
+      items:
+        - productId: 1
+          quantity: 2
+    capture:
+      # Simple capture - auto-detect JSONPath
+      - orderId
+      - orderNumber
+      # Mapped capture - different field name
+      - totalAmount: "total"
+      - createdTime: "created_at"
+    assert:
+      status: 201
+
+  - name: "Get Order Items"
+    endpoint: "GET /orders/{orderId}/items"
+    params:
+      orderId: "${orderId}"
+    capture:
+      # Explicit JSONPath
+      - firstItemId:
+          path: "$.items[0].id"
+      - allItemIds:
+          path: "$.items[*].id"
+          match: "all"
+    assert:
+      status: 200
+
+  - name: "Update Order Item"
+    endpoint: "PUT /orders/{orderId}/items/{itemId}"
+    params:
+      orderId: "${orderId}"
+      itemId: "${firstItemId}"
+    payload:
+      quantity: 5
+    assert:
+      status: 200

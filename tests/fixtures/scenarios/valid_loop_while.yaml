@@ -1,0 +1,14 @@
+version: "1.0"
+name: "While Condition Loop"
+description: "Test scenario with while condition loop"
+
+scenario:
+  - name: "Trigger action"
+    endpoint: "POST /trigger"
+
+  - name: "Poll until finished"
+    endpoint: "GET /status"
+    loop:
+      while: "$.status != 'finished'"
+      max: 100
+      interval: 30000

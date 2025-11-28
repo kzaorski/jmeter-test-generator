@@ -1,0 +1,9 @@
+version: "1.0"
+name: "Invalid Loop - Neither count nor while"
+description: "Invalid: must specify either count or while"
+
+scenario:
+  - name: "Invalid loop"
+    endpoint: "GET /status"
+    loop:
+      interval: 5000

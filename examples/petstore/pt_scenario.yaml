@@ -1,0 +1,65 @@
+version: "1.0"
+name: "Petstore CRUD Flow"
+description: "Create, read, update, and delete a pet in the Petstore API"
+
+settings:
+  threads: 1
+  rampup: 0
+  duration: null
+
+variables:
+  api_key: "special-key"
+  pet_name: "TestDog"
+  pet_status: "available"
+
+scenario:
+  - name: "Add a new pet"
+    endpoint: "addPet"
+    payload:
+      id: 12345
+      name: "${pet_name}"
+      status: "${pet_status}"
+      category:
+        id: 1
+        name: "Dogs"
+      photoUrls:
+        - "https://example.com/photo.jpg"
+      tags:
+        - id: 1
+          name: "tag1"
+    capture:
+      - petId: "id"
+    assert:
+      status: 200
+
+  - name: "Get pet by ID"
+    endpoint: "GET /pet/${petId}"
+    headers:
+      api_key: "${api_key}"
+    assert:
+      status: 200
+      body:
+        name: "${pet_name}"
+
+  - name: "Update pet"
+    endpoint: "updatePet"
+    payload:
+      id: "${petId}"
+      name: "${pet_name}-updated"
+      status: "sold"
+    assert:
+      status: 200
+
+  - name: "Find pets by status"
+    endpoint: "findPetsByStatus"
+    params:
+      status: "sold"
+    assert:
+      status: 200
+
+  - name: "Delete pet"
+    endpoint: "DELETE /pet/${petId}"
+    headers:
+      api_key: "${api_key}"
+    assert:
+      status: 200

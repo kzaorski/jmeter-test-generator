@@ -1,0 +1,8 @@
+version: "1.0"
+description: "This scenario file is missing the required name field"
+
+scenario:
+  - name: "List Users"
+    endpoint: "listUsers"
+    assert:
+      status: 200

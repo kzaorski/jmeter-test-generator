@@ -1,0 +1,19 @@
+version: "1.0"
+name: "Invalid Endpoint Format"
+description: "Contains endpoints with invalid format"
+
+scenario:
+  - name: "Invalid HTTP Method"
+    endpoint: "INVALID /users"
+    assert:
+      status: 200
+
+  - name: "Missing Path"
+    endpoint: "GET"
+    assert:
+      status: 200
+
+  - name: "Empty Endpoint"
+    endpoint: ""
+    assert:
+      status: 200

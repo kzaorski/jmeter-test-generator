@@ -1,0 +1,10 @@
+version: "1.0"
+name: "Missing Scenario Section"
+description: "This file is missing the required scenario section"
+
+settings:
+  threads: 10
+  rampup: 5
+
+variables:
+  api_version: "v1"

@@ -1,0 +1,8 @@
+name: "Missing Version Field"
+description: "This scenario file is missing the required version field"
+
+scenario:
+  - name: "List Users"
+    endpoint: "listUsers"
+    assert:
+      status: 200

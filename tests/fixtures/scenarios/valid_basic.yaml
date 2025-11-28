@@ -1,0 +1,17 @@
+version: "1.0"
+name: "Basic Test Scenario"
+
+scenario:
+  - name: "Get Users"
+    endpoint: "GET /users"
+    assert:
+      status: 200
+
+  - name: "Create User"
+    endpoint: "POST /users"
+    payload:
+      email: "test@example.com"
+      firstName: "Test"
+      lastName: "User"
+    assert:
+      status: 201

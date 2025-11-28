@@ -1,0 +1,20 @@
+version: "1.0"
+name: "Undefined Variable Reference"
+description: "Uses variables before they are captured"
+
+scenario:
+  - name: "Use Undefined Variable"
+    endpoint: "GET /users/{userId}"
+    params:
+      userId: "${userId}"
+    assert:
+      status: 200
+
+  - name: "Create User"
+    endpoint: "createUser"
+    payload:
+      email: "test@example.com"
+    capture:
+      - userId
+    assert:
+      status: 201

@@ -1,0 +1,42 @@
+version: "1.0"
+name: "OperationId Format Only"
+description: "All endpoints use operationId format"
+
+scenario:
+  - name: "List Users"
+    endpoint: "listUsers"
+    assert:
+      status: 200
+
+  - name: "Create User"
+    endpoint: "createUser"
+    payload:
+      email: "test@example.com"
+      firstName: "Test"
+    capture:
+      - userId
+    assert:
+      status: 201
+
+  - name: "Get User"
+    endpoint: "getUserById"
+    params:
+      userId: "${userId}"
+    assert:
+      status: 200
+
+  - name: "Update User"
+    endpoint: "updateUser"
+    params:
+      userId: "${userId}"
+    payload:
+      firstName: "Updated"
+    assert:
+      status: 200
+
+  - name: "Delete User"
+    endpoint: "deleteUser"
+    params:
+      userId: "${userId}"
+    assert:
+      status: 200

@@ -1,0 +1,14 @@
+version: "1.0"
+name: "Broken YAML Syntax"
+description: "This file has invalid YAML syntax
+
+scenario:
+  - name: "Missing closing quote
+    endpoint: "listUsers"
+    assert:
+      status: 200
+
+  - name: "Bad indentation"
+endpoint: "createUser"  # Wrong indentation
+    payload:
+      email: "test@example.com"

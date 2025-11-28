@@ -1,0 +1,13 @@
+version: "1.0"
+name: "Fixed Count Loop"
+description: "Test scenario with fixed count loop"
+
+scenario:
+  - name: "Trigger action"
+    endpoint: "POST /trigger"
+
+  - name: "Poll status 10 times"
+    endpoint: "GET /status"
+    loop:
+      count: 10
+      interval: 5000
