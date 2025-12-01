@@ -38,7 +38,6 @@ class TestScenarioVisualizer:
     def simple_scenario(self):
         """Create a simple scenario for testing."""
         return ParsedScenario(
-            version="1.0",
             name="Test Scenario",
             description="A test scenario",
             settings=ScenarioSettings(
@@ -145,7 +144,6 @@ class TestScenarioVisualizer:
     def test_visualize_empty_scenario(self, visualizer, console_output):
         """Test visualization of scenario with no steps."""
         scenario = ParsedScenario(
-            version="1.0",
             name="Empty Scenario",
             description=None,
             settings=ScenarioSettings(),
@@ -160,7 +158,6 @@ class TestScenarioVisualizer:
     def test_visualize_no_captures(self, visualizer, console_output):
         """Test visualization of scenario without captures."""
         scenario = ParsedScenario(
-            version="1.0",
             name="No Captures",
             description=None,
             settings=ScenarioSettings(),
@@ -199,7 +196,6 @@ class TestScenarioVisualizerMethods:
     def test_method_colors(self, visualizer, console_output):
         """Test that different HTTP methods are displayed."""
         scenario = ParsedScenario(
-            version="1.0",
             name="Test",
             description=None,
             settings=ScenarioSettings(),
@@ -232,7 +228,6 @@ class TestScenarioVisualizerMethods:
     def test_render_to_console(self, visualizer, console_output):
         """Test rendering to a Rich console."""
         scenario = ParsedScenario(
-            version="1.0",
             name="Console Test",
             description=None,
             settings=ScenarioSettings(),
@@ -274,7 +269,6 @@ class TestScenarioVisualizerEdgeCases:
         long_name = "This is a very long step name that might cause formatting issues " * 3
 
         scenario = ParsedScenario(
-            version="1.0",
             name="Test",
             description=None,
             settings=ScenarioSettings(),
@@ -309,7 +303,6 @@ class TestScenarioVisualizerEdgeCases:
         ]
 
         scenario = ParsedScenario(
-            version="1.0",
             name="Many Steps",
             description=None,
             settings=ScenarioSettings(),
@@ -331,7 +324,6 @@ class TestScenarioVisualizerEdgeCases:
         ]
 
         scenario = ParsedScenario(
-            version="1.0",
             name="Many Captures",
             description=None,
             settings=ScenarioSettings(),
@@ -356,7 +348,6 @@ class TestScenarioVisualizerEdgeCases:
     def test_disabled_step(self, visualizer, console_output):
         """Test visualization of disabled step."""
         scenario = ParsedScenario(
-            version="1.0",
             name="Disabled Test",
             description=None,
             settings=ScenarioSettings(),
@@ -382,7 +373,6 @@ class TestScenarioVisualizerEdgeCases:
     def test_correlation_warnings(self, visualizer, console_output):
         """Test display of correlation warnings."""
         scenario = ParsedScenario(
-            version="1.0",
             name="Warnings Test",
             description=None,
             settings=ScenarioSettings(),

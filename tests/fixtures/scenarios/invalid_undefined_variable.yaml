@@ -1,4 +1,3 @@
-version: "1.0"
 name: "Undefined Variable Reference"
 description: "Uses variables before they are captured"
 

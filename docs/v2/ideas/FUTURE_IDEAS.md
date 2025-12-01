@@ -62,7 +62,6 @@ scenario:
 
 **Example**:
 ```yaml
-version: "1.0"
 name: "Full API Test"
 
 scenarios:

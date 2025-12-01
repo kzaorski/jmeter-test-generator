@@ -13,7 +13,7 @@ pip install -e .
 
 ```bash
 jmeter-gen --version
-# Output: jmeter-gen, version 1.0.0
+# Output: jmeter-gen, version 3.0.0
 ```
 
 ## Basic Usage
@@ -152,6 +152,96 @@ jmeter-gen validate api-load-test.jmx
 jmeter -n -t api-load-test.jmx -l results.jtl
 ```
 
+## Scenario-Based Testing
+
+For realistic user flows with variable correlation, create a `pt_scenario.yaml` file.
+
+### Create Scenario with Wizard
+
+```bash
+jmeter-gen new scenario
+```
+
+The wizard guides you through:
+1. Scenario name and description
+2. Thread/ramp-up/duration settings
+3. Endpoint selection from OpenAPI spec
+4. Capture suggestions from response schema
+5. Loop and think time configuration
+
+### Example pt_scenario.yaml
+
+```yaml
+name: "User CRUD Flow"
+description: "Create, read, update, delete user"
+
+settings:
+  threads: 10
+  rampup: 5
+  duration: 60
+
+scenario:
+  - name: "Create User"
+    endpoint: "POST /users"
+    payload:
+      email: "test@example.com"
+      password: "secret123"
+    capture:
+      - userId
+    assert:
+      status: 201
+
+  - name: "Get User"
+    endpoint: "GET /users/{userId}"
+    params:
+      userId: "${userId}"
+    assert:
+      status: 200
+
+  - name: "Update User"
+    endpoint: "PUT /users/{userId}"
+    params:
+      userId: "${userId}"
+    payload:
+      firstName: "Updated"
+    assert:
+      status: 200
+
+  - name: "Delete User"
+    endpoint: "DELETE /users/{userId}"
+    params:
+      userId: "${userId}"
+    assert:
+      status: 200
+```
+
+### Generate from Scenario
+
+```bash
+# Auto-detects pt_scenario.yaml in project
+jmeter-gen generate
+
+# Or specify explicitly
+jmeter-gen generate --scenario pt_scenario.yaml
+```
+
+Output includes variable flow visualization:
+```
+Scenario: User CRUD Flow
+========================
+
+[1] Create User (POST /users)
+    capture: userId
+    assert: 201
+
+[2] Get User (GET /users/{userId})
+    uses: ${userId}
+    assert: 200
+
+Variable Flow:
+  userId: [1] --> [2,3,4]
+```
+
 ## MCP Server Mode (GitHub Copilot)
 
 ### 1. Configure VS Code
@@ -197,12 +287,18 @@ jmeter-gen analyze [--project-path PATH]
 # Generate JMX
 jmeter-gen generate [OPTIONS]
   --spec PATH           Path to OpenAPI spec
+  --scenario PATH       Path to pt_scenario.yaml file
   --output, -o PATH     Output JMX file
   --threads, -t INT     Number of threads (default: 1)
   --rampup, -r INT      Ramp-up period in seconds (default: 0)
   --duration, -d INT    Test duration in seconds (default: None - iteration-based)
   --endpoints, -e TEXT  Specific endpoints to include (can be repeated)
   --base-url URL        Override base URL from spec
+
+# Create new scenario (interactive wizard)
+jmeter-gen new scenario [OPTIONS]
+  --spec PATH           Path to OpenAPI spec (auto-detected if not provided)
+  --output, -o NAME     Output filename (default: pt_scenario.yaml)
 
 # Validate JMX
 jmeter-gen validate JMX_PATH
@@ -268,25 +364,28 @@ jmeter-gen generate --spec openapi.yaml --base-url https://api.production.com
 
 Or update the HTTP Request Defaults element in the generated JMX file.
 
-## Known Limitations
+## Current Capabilities
 
-Current version (v1.0.0) has these limitations:
+**Supported:**
+- OpenAPI 3.x and Swagger 2.0 specifications
+- Scenario-based sequential test flows
+- Variable capture and correlation
+- Loop constructs (count-based and while-condition)
+- Think time between steps
+- Custom payloads and assertions
+- Interactive scenario wizard
 
-- **Authentication**: No built-in support for Bearer tokens, API keys, or Basic Auth
-- **Request Bodies**: Uses minimal sample data (not production-ready)
-- **Correlation**: No automatic extraction of variables from responses
-- **Data Sets**: No CSV Data Set Config for parameterized testing
-- **Assertions**: Only status code assertions (200/201)
-- **Dynamic Data**: No integration with faker or random data generators
-
-These features are planned for future releases (see CHANGELOG.md).
+**Limitations:**
+- No built-in authentication helpers (Bearer, API keys, Basic Auth)
+- No CSV Data Set Config for external test data
+- No Faker/random data generation
+- Status code and body assertions only (no response time assertions)
 
 ## Next Steps
 
-1. Read [Architecture](docs/ARCHITECTURE.md) to understand how it works
-2. Read [Development Guide](docs/DEVELOPMENT.md) to contribute
-3. Check [examples/](examples/) for real-world use cases
-4. Explore advanced features in documentation
+1. Read [Scenario Specification](docs/v2/PT_SCENARIO_SPEC.md) for pt_scenario.yaml format
+2. Check [examples/](examples/) for working examples
+3. Review [CHANGELOG.md](CHANGELOG.md) for version history
 
 ## Getting Help
 

@@ -15,6 +15,7 @@ Prioritized list of planned extensions for JMeter Test Generator.
 | Loop Support | count and while loops with interval |
 | Output folder prompt | Prompt for output folder when generating JMX (default: current directory) |
 | Transaction Controllers | Group samplers into logical transactions for aggregated metrics |
+| Scenario Init Wizard | Interactive `jmeter-gen new scenario` command (v3.0.0) |
 
 ---
 
@@ -22,8 +23,8 @@ Prioritized list of planned extensions for JMeter Test Generator.
 
 | Extension | Description |
 |-----------|-------------|
-| CSV Data Set Config | Data-driven testing with CSV files |
-| Request body generation | Generate realistic test data with Faker |
+| Multi-step Loops | Extend loops to wrap multiple steps, not just single endpoint |
+| Global Authorization | Auto-apply captured token (Bearer) to all subsequent requests |
 | More assertion types | JSON assertions, regex, response time |
 
 ---
@@ -32,7 +33,8 @@ Prioritized list of planned extensions for JMeter Test Generator.
 
 | Extension | Description |
 |-----------|-------------|
-| Scenario Init Wizard | Interactive `jmeter-gen scenario init` command |
+| CSV Data Set Config | Data-driven testing with CSV files |
+| Foreach Loop | Iterate over captured array variables (petIds_1, petIds_2, etc.) |
 | Conditional Execution | if/else conditions for scenario steps |
 | Think Time | Configurable delays between steps |
 | Bearer token support | Authorization header with Bearer tokens |

@@ -1,4 +1,3 @@
-version: "1.0"
 name: "METHOD /path Format Only"
 description: "All endpoints use METHOD /path format"
 

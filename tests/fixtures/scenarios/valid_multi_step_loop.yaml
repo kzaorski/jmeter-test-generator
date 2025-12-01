@@ -1,0 +1,36 @@
+name: "Multi-Step Loop Test"
+description: "Test scenario with multi-step loop block"
+
+settings:
+  threads: 1
+  rampup: 0
+
+scenario:
+  - name: "Create Order"
+    endpoint: "POST /orders"
+    capture:
+      - orderId
+    assert:
+      status: 201
+
+  - loop:
+      count: 5
+      interval: 1000
+    steps:
+      - name: "Check Status"
+        endpoint: "GET /orders/${orderId}/status"
+        capture:
+          - status
+        assert:
+          status: 200
+      - name: "Wait"
+        think_time: 500
+      - name: "Get Details"
+        endpoint: "GET /orders/${orderId}"
+        assert:
+          status: 200
+
+  - name: "Confirm Order"
+    endpoint: "POST /orders/${orderId}/confirm"
+    assert:
+      status: 200

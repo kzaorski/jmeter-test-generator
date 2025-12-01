@@ -89,7 +89,6 @@ paths:
     def simple_scenario(self):
         """Create a simple scenario for testing."""
         return ParsedScenario(
-            version="1.0",
             name="Test Scenario",
             description="A test scenario",
             settings=ScenarioSettings(
@@ -358,7 +357,6 @@ paths:
     def test_generate_minimal_scenario(self, generator, tmp_path):
         """Test generating from minimal scenario."""
         scenario = ParsedScenario(
-            version="1.0",
             name="Minimal",
             description=None,
             settings=ScenarioSettings(),
@@ -387,7 +385,6 @@ paths:
     def test_generate_with_operationid_endpoint(self, generator, tmp_path):
         """Test generating with operationId format endpoint."""
         scenario = ParsedScenario(
-            version="1.0",
             name="OperationId Test",
             description=None,
             settings=ScenarioSettings(base_url="http://localhost:8000"),
@@ -413,7 +410,6 @@ paths:
     def test_generate_with_body_assertions(self, generator, tmp_path):
         """Test generating with body assertions."""
         scenario = ParsedScenario(
-            version="1.0",
             name="Body Assert Test",
             description=None,
             settings=ScenarioSettings(base_url="http://localhost:8000"),
@@ -451,7 +447,6 @@ paths:
     def test_generate_http_defaults(self, generator, tmp_path):
         """Test that HTTP Request Defaults are generated."""
         scenario = ParsedScenario(
-            version="1.0",
             name="Defaults Test",
             description=None,
             settings=ScenarioSettings(
@@ -494,7 +489,6 @@ paths:
     def test_generate_user_defined_variables(self, generator, tmp_path):
         """Test that user-defined variables are included."""
         scenario = ParsedScenario(
-            version="1.0",
             name="Variables Test",
             description=None,
             settings=ScenarioSettings(base_url="http://localhost:8000"),
@@ -530,7 +524,6 @@ paths:
     def test_generate_disabled_step_skipped(self, generator, tmp_path):
         """Test that disabled steps are skipped."""
         scenario = ParsedScenario(
-            version="1.0",
             name="Disabled Test",
             description=None,
             settings=ScenarioSettings(),
@@ -605,7 +598,6 @@ paths:
     def test_generate_loop_controller_count(self, generator, tmp_path):
         """Test that LoopController is generated for count loops."""
         scenario = ParsedScenario(
-            version="1.0",
             name="Count Loop Test",
             description=None,
             settings=ScenarioSettings(base_url="http://localhost:8000"),
@@ -654,7 +646,6 @@ paths:
     def test_generate_while_controller(self, generator, tmp_path):
         """Test that WhileController is generated for while loops."""
         scenario = ParsedScenario(
-            version="1.0",
             name="While Loop Test",
             description=None,
             settings=ScenarioSettings(base_url="http://localhost:8000"),
@@ -698,7 +689,6 @@ paths:
     def test_generate_loop_with_interval(self, generator, tmp_path):
         """Test that ConstantTimer is generated for loop interval."""
         scenario = ParsedScenario(
-            version="1.0",
             name="Loop Interval Test",
             description=None,
             settings=ScenarioSettings(base_url="http://localhost:8000"),
@@ -736,10 +726,84 @@ paths:
         assert delay_prop is not None
         assert delay_prop.text == "30000"
 
+    def test_loop_interval_timer_at_loop_level(self, generator, tmp_path):
+        """Test that loop interval timer is sibling of TransactionController, not child of sampler."""
+        scenario = ParsedScenario(
+            name="Timer Placement Test",
+            description=None,
+            settings=ScenarioSettings(base_url="http://localhost:8000"),
+            variables={},
+            steps=[
+                ScenarioStep(
+                    name="Poll Status",
+                    endpoint="GET /status",
+                    endpoint_type="method_path",
+                    method="GET",
+                    path="/status",
+                    loop=LoopConfig(count=5, interval=10000),
+                ),
+            ],
+        )
+
+        output_path = tmp_path / "timer_placement.jmx"
+        result = generator.generate(scenario=scenario, output_path=str(output_path))
+        assert result["success"] is True
+
+        tree = ET.parse(output_path)
+        root = tree.getroot()
+
+        # Find the LoopController's hashTree
+        loop_controller = root.find(".//LoopController")
+        assert loop_controller is not None
+
+        # Get the hashTree following the LoopController (its children container)
+        loop_parent = None
+        for elem in root.iter():
+            for child in elem:
+                if child is loop_controller:
+                    loop_parent = elem
+                    break
+
+        assert loop_parent is not None, "LoopController parent not found"
+
+        # Find the hashTree after LoopController (loop_hashtree)
+        children = list(loop_parent)
+        loop_idx = children.index(loop_controller)
+        loop_hashtree = children[loop_idx + 1]
+        assert loop_hashtree.tag == "hashTree", "Expected hashTree after LoopController"
+
+        # The ConstantTimer should be a direct child of loop_hashtree
+        timer = None
+        for child in loop_hashtree:
+            if child.tag == "ConstantTimer":
+                timer = child
+                break
+
+        assert timer is not None, "ConstantTimer should be direct child of loop hashTree"
+
+        # Verify the timer is NOT inside the HTTPSampler's hashTree
+        sampler = root.find(".//HTTPSamplerProxy")
+        assert sampler is not None
+
+        # Find sampler's parent hashTree
+        sampler_parent = None
+        for elem in root.iter():
+            for child in elem:
+                if child is sampler:
+                    sampler_parent = elem
+                    break
+
+        sampler_children = list(sampler_parent)
+        sampler_idx = sampler_children.index(sampler)
+        sampler_hashtree = sampler_children[sampler_idx + 1]
+
+        # Timer should NOT be in sampler's hashTree
+        timer_in_sampler = sampler_hashtree.find("ConstantTimer")
+        assert timer_in_sampler is None, "ConstantTimer should NOT be inside sampler hashTree"
+
     def test_generate_while_loop_adds_extractor(self, generator, tmp_path):
         """Test that while loop adds JSONPostProcessor for condition variable."""
         scenario = ParsedScenario(
-            version="1.0",
             name="While Extractor Test",
             description=None,
             settings=ScenarioSettings(base_url="http://localhost:8000"),
@@ -784,7 +848,6 @@ paths:
     def test_generate_step_without_loop(self, generator, tmp_path):
         """Test that steps without loop don't get controllers."""
         scenario = ParsedScenario(
-            version="1.0",
             name="No Loop Test",
             description=None,
             settings=ScenarioSettings(base_url="http://localhost:8000"),
@@ -820,7 +883,6 @@ paths:
     def test_generate_mixed_loop_and_no_loop(self, generator, tmp_path):
         """Test scenario with both looped and non-looped steps."""
         scenario = ParsedScenario(
-            version="1.0",
             name="Mixed Loop Test",
             description=None,
             settings=ScenarioSettings(base_url="http://localhost:8000"),
@@ -965,7 +1027,6 @@ paths:
     def test_step_wrapped_in_transaction_controller(self, generator, tmp_path):
         """Test that each step is wrapped in a Transaction Controller."""
         scenario = ParsedScenario(
-            version="1.0",
             name="TC Test",
             description=None,
             settings=ScenarioSettings(base_url="http://localhost:8000"),
@@ -1013,7 +1074,6 @@ paths:
     def test_loop_with_transaction_controller(self, generator, tmp_path):
         """Test that Transaction Controller is inside LoopController."""
         scenario = ParsedScenario(
-            version="1.0",
             name="Loop TC Test",
             description=None,
             settings=ScenarioSettings(base_url="http://localhost:8000"),
@@ -1054,7 +1114,6 @@ paths:
     def test_transaction_controller_naming(self, generator, tmp_path):
         """Test Transaction Controller naming format."""
         scenario = ParsedScenario(
-            version="1.0",
             name="Naming Test",
             description=None,
             settings=ScenarioSettings(base_url="http://localhost:8000"),
@@ -1105,7 +1164,6 @@ paths:
     def test_transaction_controller_contains_sampler(self, generator, tmp_path):
         """Test that HTTP sampler is inside Transaction Controller hashTree."""
         scenario = ParsedScenario(
-            version="1.0",
             name="Hierarchy Test",
             description=None,
             settings=ScenarioSettings(base_url="http://localhost:8000"),
@@ -1136,3 +1194,231 @@ paths:
         sampler_pos = content.find("HTTPSamplerProxy")
 
         assert tc_pos < sampler_pos, "TransactionController should appear before HTTPSamplerProxy"
+
+
+class TestCapturedVarsSubstitution:
+    """Tests for captured variable substitution in auto-generated payloads."""
+
+    @pytest.fixture
+    def parser(self, tmp_path):
+        """Create a parser instance with sample spec."""
+        spec_content = """openapi: 3.0.0
+info:
+  title: Test API
+  version: 1.0.0
+servers:
+  - url: http://localhost:8000
+paths:
+  /trigger:
+    post:
+      operationId: triggerProcess
+      summary: Trigger a process
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  correlationId:
+                    type: string
+                  processId:
+                    type: integer
+  /status:
+    post:
+      operationId: checkStatus
+      summary: Check process status
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                correlationId:
+                  type: string
+                otherField:
+                  type: string
+      responses:
+        '200':
+          description: Success
+"""
+        spec_path = tmp_path / "openapi.yaml"
+        spec_path.write_text(spec_content)
+
+        parser = OpenAPIParser()
+        parser.parse(str(spec_path))
+        return parser
+
+    @pytest.fixture
+    def generator(self, parser):
+        """Create a ScenarioJMXGenerator instance."""
+        return ScenarioJMXGenerator(parser)
+
+    def test_substitute_captured_vars_simple(self, generator):
+        """Test simple field substitution."""
+        payload = {"correlationId": "string", "otherField": "value"}
+        captured_vars = {"correlationId"}
+
+        result = generator._substitute_captured_vars(payload, captured_vars)
+
+        assert result["correlationId"] == "${correlationId}"
+        assert result["otherField"] == "value"
+
+    def test_substitute_captured_vars_nested(self, generator):
+        """Test nested object substitution."""
+        payload = {
+            "data": {
+                "correlationId": "string",
+                "nested": {
+                    "processId": 0,
+                    "status": "pending"
+                }
+            }
+        }
+        captured_vars = {"correlationId", "processId"}
+
+        result = generator._substitute_captured_vars(payload, captured_vars)
+
+        assert result["data"]["correlationId"] == "${correlationId}"
+        assert result["data"]["nested"]["processId"] == "${processId}"
+        assert result["data"]["nested"]["status"] == "pending"
+
+    def test_substitute_captured_vars_array(self, generator):
+        """Test substitution in arrays of objects."""
+        payload = {
+            "items": [
+                {"id": 1, "correlationId": "string"},
+                {"id": 2, "correlationId": "string"}
+            ]
+        }
+        captured_vars = {"correlationId"}
+
+        result = generator._substitute_captured_vars(payload, captured_vars)
+
+        assert result["items"][0]["correlationId"] == "${correlationId}"
+        assert result["items"][1]["correlationId"] == "${correlationId}"
+        assert result["items"][0]["id"] == 1
+        assert result["items"][1]["id"] == 2
+
+    def test_substitute_captured_vars_empty_set(self, generator):
+        """Test that no substitution happens with empty captured_vars."""
+        payload = {"correlationId": "string", "field": "value"}
+        captured_vars: set = set()
+
+        result = generator._substitute_captured_vars(payload, captured_vars)
+
+        assert result["correlationId"] == "string"
+        assert result["field"] == "value"
+
+    def test_substitute_captured_vars_no_match(self, generator):
+        """Test that no substitution happens when no fields match."""
+        payload = {"field1": "value1", "field2": "value2"}
+        captured_vars = {"otherVar"}
+
+        result = generator._substitute_captured_vars(payload, captured_vars)
+
+        assert result["field1"] == "value1"
+        assert result["field2"] == "value2"
+
+    def test_generate_with_captured_var_substitution(self, generator, tmp_path):
+        """Test end-to-end generation with captured variable substitution."""
+        scenario = ParsedScenario(
+            name="Correlation Test",
+            description="Test captured variable substitution",
+            settings=ScenarioSettings(base_url="http://localhost:8000"),
+            variables={},
+            steps=[
+                ScenarioStep(
+                    name="Trigger",
+                    endpoint="POST /trigger",
+                    endpoint_type="method_path",
+                    method="POST",
+                    path="/trigger",
+                    captures=[
+                        CaptureConfig(
+                            variable_name="correlationId",
+                            jsonpath="$.correlationId",
+                        )
+                    ],
+                ),
+                ScenarioStep(
+                    name="Check Status",
+                    endpoint="POST /status",
+                    endpoint_type="method_path",
+                    method="POST",
+                    path="/status",
+                    # No payload - should be auto-generated with substitution
+                ),
+            ],
+        )
+
+        # Create correlation result matching the captures
+        correlation_result = CorrelationResult(
+            mappings=[
+                CorrelationMapping(
+                    source_step=1,
+                    source_endpoint="POST /trigger",
+                    variable_name="correlationId",
+                    jsonpath="$.correlationId",
+                    confidence=1.0,
+                    target_steps=[2],
+                )
+            ],
+            warnings=[],
+            errors=[],
+        )
+
+        output_path = tmp_path / "correlation_test.jmx"
+
+        result = generator.generate(
+            scenario=scenario,
+            output_path=str(output_path),
+            correlation_result=correlation_result,
+        )
+
+        assert result["success"] is True
+
+        # Read the generated JMX and check for substitution
+        content = output_path.read_text()
+
+        # The second request (Check Status) should have ${correlationId} in the body
+        assert "${correlationId}" in content
+
+    def test_substitute_scenario_variables(self, generator, tmp_path):
+        """Test that scenario-level variables are substituted in auto-generated payloads."""
+        scenario = ParsedScenario(
+            name="Variables Test",
+            description="Test scenario variable substitution",
+            settings=ScenarioSettings(base_url="http://localhost:8000"),
+            variables={
+                "correlationId": "test-correlation-123",
+                "apiKey": "secret-key",
+            },
+            steps=[
+                ScenarioStep(
+                    name="Check Status",
+                    endpoint="POST /status",
+                    endpoint_type="method_path",
+                    method="POST",
+                    path="/status",
+                    # No payload - should be auto-generated with variable substitution
+                ),
+            ],
+        )
+
+        output_path = tmp_path / "variables_test.jmx"
+
+        result = generator.generate(
+            scenario=scenario,
+            output_path=str(output_path),
+        )
+
+        assert result["success"] is True
+
+        # Read the generated JMX and check for substitution
+        content = output_path.read_text()
+
+        # correlationId field should be substituted with ${correlationId}
+        assert "${correlationId}" in content

@@ -24,7 +24,6 @@ class TestGenerateMermaidDiagram:
     def test_single_step_scenario(self):
         """Test diagram generation with single step."""
         scenario = ParsedScenario(
-            version="1.0",
             name="Simple Test",
             description=None,
             settings=ScenarioSettings(),
@@ -50,7 +49,6 @@ class TestGenerateMermaidDiagram:
     def test_multi_step_scenario(self):
         """Test diagram generation with multiple steps."""
         scenario = ParsedScenario(
-            version="1.0",
             name="User Flow",
             description=None,
             settings=ScenarioSettings(),
@@ -82,7 +80,6 @@ class TestGenerateMermaidDiagram:
     def test_diagram_with_correlations(self):
         """Test diagram shows variable flows from correlations."""
         scenario = ParsedScenario(
-            version="1.0",
             name="Correlated Flow",
             description=None,
             settings=ScenarioSettings(),
@@ -123,7 +120,6 @@ class TestGenerateMermaidDiagram:
     def test_diagram_with_non_consecutive_variable_flow(self):
         """Test diagram shows dashed edges for non-consecutive variable flows."""
         scenario = ParsedScenario(
-            version="1.0",
             name="Long Flow",
             description=None,
             settings=ScenarioSettings(),
@@ -155,7 +151,6 @@ class TestGenerateMermaidDiagram:
     def test_diagram_without_correlations(self):
         """Test diagram works without correlation result."""
         scenario = ParsedScenario(
-            version="1.0",
             name="No Correlations",
             description=None,
             settings=ScenarioSettings(),
@@ -174,7 +169,6 @@ class TestGenerateMermaidDiagram:
     def test_operationid_endpoint_format(self):
         """Test diagram with operationId endpoint format."""
         scenario = ParsedScenario(
-            version="1.0",
             name="OpId Test",
             description=None,
             settings=ScenarioSettings(),
@@ -200,7 +194,6 @@ class TestGenerateTextVisualization:
     def test_basic_text_visualization(self):
         """Test basic text output format."""
         scenario = ParsedScenario(
-            version="1.0",
             name="Test Scenario",
             description=None,
             settings=ScenarioSettings(),
@@ -226,7 +219,6 @@ class TestGenerateTextVisualization:
     def test_text_with_captures_and_uses(self):
         """Test text shows captures and variable usage."""
         scenario = ParsedScenario(
-            version="1.0",
             name="Flow",
             description=None,
             settings=ScenarioSettings(),
@@ -266,7 +258,6 @@ class TestGenerateTextVisualization:
     def test_text_shows_flow_arrows(self):
         """Test text shows flow arrows between steps."""
         scenario = ParsedScenario(
-            version="1.0",
             name="Multi Step",
             description=None,
             settings=ScenarioSettings(),

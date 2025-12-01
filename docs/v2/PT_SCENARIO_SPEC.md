@@ -9,7 +9,6 @@ The `pt_scenario.yaml` file defines performance test scenarios with sequential s
 ## File Structure
 
 ```yaml
-version: "1.0"              # Required: Specification version
 name: "Scenario Name"       # Required: Display name
 description: "..."          # Optional: Scenario description
 
@@ -39,7 +38,6 @@ Note: The OpenAPI specification is auto-detected by `jmeter-gen generate` comman
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `version` | string | Yes | Specification version (currently "1.0") |
 | `name` | string | Yes | Scenario display name |
 | `description` | string | No | Scenario description |
 | `settings` | object | No | Test execution settings |
@@ -54,6 +52,7 @@ Note: The OpenAPI specification is auto-detected by `jmeter-gen generate` comman
 settings:
   threads: 10                    # Number of concurrent threads
   rampup: 5                      # Ramp-up period in seconds
+  loops: 5                       # Number of iterations (optional)
   duration: 60                   # Test duration in seconds (optional)
   base_url: "http://localhost"   # Override base URL from spec
 ```
@@ -62,8 +61,37 @@ settings:
 |-------|------|---------|-------------|
 | `threads` | integer | 1 | Number of concurrent virtual users |
 | `rampup` | integer | 0 | Time to start all threads (seconds) |
-| `duration` | integer | null | Test duration (seconds), null = single iteration |
+| `loops` | integer | null | Number of iterations per thread (see below) |
+| `duration` | integer | null | Test duration (seconds), used when loops is infinite |
 | `base_url` | string | from spec | Override API base URL |
+
+### Loops vs Duration
+
+The `loops` and `duration` settings control how many times the test runs:
+
+- **`loops: N`** (N > 0): Run exactly N iterations per thread. Duration is ignored.
+- **`loops: 0`** or **`loops: -1`**: Run infinite iterations, limited by `duration`.
+- **No loops + `duration`**: Run infinite iterations for the specified duration.
+- **No loops + no duration**: Run exactly 1 iteration (default).
+
+Examples:
+```yaml
+# Fixed 10 iterations per thread
+settings:
+  threads: 5
+  loops: 10
+
+# Run for 60 seconds
+settings:
+  threads: 5
+  duration: 60
+
+# Run for 60 seconds (explicit infinite)
+settings:
+  threads: 5
+  loops: 0
+  duration: 60
+```
 
 ---
 
@@ -309,27 +337,89 @@ condition:
 
 ## Loop Syntax
 
-Loop control allows repeating a step multiple times.
+Loop control allows repeating a step or group of steps multiple times.
 
-### Fixed Count Loop
+### Single-Step Loop (Fixed Count)
+
+Repeat a single endpoint call multiple times:
 
 ```yaml
-loop:
-  count: 5                    # Repeat step 5 times
-  interval: 1000              # Optional: delay between iterations (ms)
+- name: "Poll Status"
+  endpoint: "GET /status"
+  loop:
+    count: 5                    # Repeat step 5 times
+    interval: 1000              # Optional: delay between iterations (ms)
+  capture:
+    - status
 ```
 
-### While Loop (condition-based)
+### Single-Step While Loop
+
+Repeat until a condition is met:
 
 ```yaml
-loop:
-  while: "$.status != 'finished'"   # JSONPath condition
-  max_iterations: 100               # Safety limit (default: 100)
-  interval: 5000                    # Optional: delay between iterations (ms)
+- name: "Wait for Completion"
+  endpoint: "GET /job/${jobId}/status"
+  loop:
+    while: "$.status != 'finished'"   # JSONPath condition
+    max: 100                          # Safety limit (default: 100)
+    interval: 5000                    # Optional: delay between iterations (ms)
+  capture:
+    - status
 ```
 
 The while loop continues until the condition evaluates to false or max_iterations is reached.
 The condition uses JSONPath syntax to check values from the response.
+
+### Multi-Step Loop
+
+Wrap multiple steps in a loop block:
+
+```yaml
+- loop:
+    count: 5
+    interval: 1000
+  steps:
+    - name: "Create Order"
+      endpoint: "POST /orders"
+      capture:
+        - orderId
+    - name: "Check Status"
+      endpoint: "GET /orders/${orderId}/status"
+      capture:
+        - status
+    - name: "Wait"
+      think_time: 500
+```
+
+Multi-step loops support:
+- `count`: Fixed number of iterations
+- `while`: Condition-based loop (JSONPath expression)
+- `max`: Safety limit for while loops (default: 100)
+- `interval`: Delay between iterations in milliseconds
+
+The `steps` array can contain any valid step type:
+- Regular endpoint calls
+- Think time delays (`think_time: ms`)
+- Captures and assertions
+
+### Multi-Step While Loop
+
+```yaml
+- loop:
+    while: "$.status != 'completed'"
+    max: 50
+    interval: 2000
+  steps:
+    - name: "Check Job Status"
+      endpoint: "GET /jobs/${jobId}/status"
+      capture:
+        - status
+    - name: "Log Progress"
+      endpoint: "POST /jobs/${jobId}/log"
+      payload:
+        message: "Checking status..."
+```
 
 ### Foreach Loop (planned)
 
@@ -340,6 +430,38 @@ loop:
 ```
 
 Note: Foreach loops are not yet implemented.
+
+---
+
+## Think Time
+
+Add delays between steps to simulate realistic user behavior:
+
+### Standalone Think Time Step
+
+```yaml
+- name: "User thinks"
+  think_time: 5000              # Wait 5 seconds
+```
+
+Or without a custom name (defaults to "Think Time"):
+
+```yaml
+- think_time: 1000              # Wait 1 second
+```
+
+### Think Time in Multi-Step Loops
+
+```yaml
+- loop:
+    count: 3
+  steps:
+    - name: "Get Status"
+      endpoint: "GET /status"
+    - think_time: 500           # Wait 500ms between iterations
+```
+
+Think time is specified in milliseconds and generates a JMeter ConstantTimer element.
 
 ---
 
@@ -383,7 +505,6 @@ headers:
 ## Complete Example
 
 ```yaml
-version: "1.0"
 name: "User CRUD Flow"
 description: "Complete user lifecycle: create, read, update, delete"
 

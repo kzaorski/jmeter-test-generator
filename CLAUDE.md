@@ -63,6 +63,10 @@ jmeter-gen validate performance-test.jmx
 
 # Start MCP Server
 jmeter-gen mcp
+
+# Create new scenario file (interactive wizard)
+jmeter-gen new scenario
+jmeter-gen new scenario --spec openapi.yaml --output my_scenario.yaml
 ```
 
 ### Testing with Example Projects
@@ -175,7 +179,12 @@ Output (formatted response)
   - PtScenarioParser, CorrelationAnalyzer, ScenarioJMXGenerator, ScenarioVisualizer
   - ScenarioMermaid module for diagram generation
   - Full MCP integration with 5 tools
-- **Overall**: 572 tests passing, 88% code coverage
+- **v3.0.0 Scenario Init Wizard** ✅ COMPLETED
+  - ScenarioWizard interactive CLI wizard
+  - `jmeter-gen new scenario` command
+  - Auto-detect OpenAPI spec, smart capture suggestions
+  - Loop and think time support
+- **Overall**: 624 tests passing, 85% code coverage
 - Project structure and configuration (pyproject.toml)
 - Package initialization files
 - Comprehensive documentation (8 docs)
@@ -548,9 +557,34 @@ endpoint: "GET /users/{userId}"
 ### v1 Documentation
 Legacy v1 documentation moved to `docs/v1/`.
 
+## v3.0.0 Scenario Init Wizard
+
+Version 3 introduces an interactive wizard for creating `pt_scenario.yaml` files.
+
+### v3 Command
+```bash
+jmeter-gen new scenario [--spec PATH] [--output NAME]
+```
+
+### v3 Core Module
+**ScenarioWizard** (`scenario_wizard.py`): Interactive CLI wizard
+- Auto-detect OpenAPI spec in project
+- Endpoint selection with "METHOD /path (operationId)" format
+- Smart capture suggestions (id, token fields)
+- Variable usage detection for endpoint suggestions
+- Loop (count/while) and think time support
+- Live preview after each step
+- YAML output generation
+
+### v3 Documentation
+All v3 specifications in `docs/v3/`:
+- **README.md**: Overview, features, user flow
+- **CORE_MODULES.md**: ScenarioWizard class specification
+- **IMPLEMENTATION_PLAN.md**: 12-step implementation plan
+
 ## Documentation References
 
-All detailed specifications in `docs/v1/` (v1) and `docs/v2/` (v2):
+All detailed specifications in `docs/v1/` (v1), `docs/v2/` (v2), and `docs/v3/` (v3):
 - **IMPLEMENTATION_PLAN.md**: Timeline, phases, deliverables, success criteria
 - **ARCHITECTURE.md**: System design, component architecture, data flow
 - **CORE_MODULES.md**: Detailed specifications for all 4 core modules

@@ -1,4 +1,3 @@
-version: "1.0"
 name: "Invalid Endpoint Format"
 description: "Contains endpoints with invalid format"
 

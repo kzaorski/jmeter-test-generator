@@ -15,12 +15,14 @@ class ScenarioSettings:
     Attributes:
         threads: Number of concurrent threads (default: 1)
         rampup: Ramp-up period in seconds (default: 0)
-        duration: Test duration in seconds (optional)
+        loops: Number of iterations per thread (None=auto, 0/-1=infinite, N=fixed)
+        duration: Test duration in seconds (optional, used when loops is infinite)
         base_url: Override base URL from OpenAPI spec (optional)
     """
 
     threads: int = 1
     rampup: int = 0
+    loops: Optional[int] = None
     duration: Optional[int] = None
     base_url: Optional[str] = None
 
@@ -29,6 +31,7 @@ class ScenarioSettings:
         return {
             "threads": self.threads,
             "rampup": self.rampup,
+            "loops": self.loops,
             "duration": self.duration,
             "base_url": self.base_url,
         }
@@ -120,7 +123,7 @@ class ScenarioStep:
     Attributes:
         name: Display name for the step
         endpoint: Endpoint reference (operationId or "METHOD /path")
-        endpoint_type: Type of endpoint - "operation_id" or "method_path"
+        endpoint_type: Type of endpoint - "operation_id", "method_path", "think_time", or "loop_block"
         method: HTTP method (only for method_path type)
         path: URL path (only for method_path type)
         enabled: Whether step is enabled (default: True)
@@ -130,11 +133,13 @@ class ScenarioStep:
         captures: List of variables to capture from response
         assertions: Response assertions
         loop: Loop configuration for repeating this step
+        think_time: Think time in milliseconds (only for think_time type)
+        nested_steps: Nested steps for multi-step loops (only for loop_block type)
     """
 
     name: str
     endpoint: str
-    endpoint_type: str  # "operation_id" or "method_path"
+    endpoint_type: str  # "operation_id", "method_path", "think_time", or "loop_block"
     method: Optional[str] = None
     path: Optional[str] = None
     enabled: bool = True
@@ -144,6 +149,8 @@ class ScenarioStep:
     captures: list[CaptureConfig] = field(default_factory=list)
     assertions: Optional[AssertConfig] = None
     loop: Optional[LoopConfig] = None
+    think_time: Optional[int] = None
+    nested_steps: list["ScenarioStep"] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
@@ -160,6 +167,8 @@ class ScenarioStep:
             "captures": [c.to_dict() for c in self.captures],
             "assertions": self.assertions.to_dict() if self.assertions else None,
             "loop": self.loop.to_dict() if self.loop else None,
+            "think_time": self.think_time,
+            "nested_steps": [s.to_dict() for s in self.nested_steps],
         }
 
 
@@ -168,7 +177,6 @@ class ParsedScenario:
     """Parsed pt_scenario.yaml file.
 
     Attributes:
-        version: Scenario format version
         name: Scenario name
         description: Optional scenario description
         settings: Execution settings
@@ -176,7 +184,6 @@ class ParsedScenario:
         steps: List of scenario steps
     """
 
-    version: str
     name: str
     description: Optional[str]
     settings: ScenarioSettings
@@ -186,7 +193,6 @@ class ParsedScenario:
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
-            "version": self.version,
             "name": self.name,
             "description": self.description,
             "settings": self.settings.to_dict(),

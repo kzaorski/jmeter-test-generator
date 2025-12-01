@@ -103,7 +103,6 @@ paths:
             )
         ]
         scenario = ParsedScenario(
-            version="1.0",
             name="Test",
             description=None,
             settings=ScenarioSettings(),
@@ -130,7 +129,6 @@ paths:
             )
         ]
         scenario = ParsedScenario(
-            version="1.0",
             name="Test",
             description=None,
             settings=ScenarioSettings(),
@@ -156,7 +154,6 @@ paths:
             )
         ]
         scenario = ParsedScenario(
-            version="1.0",
             name="Test",
             description=None,
             settings=ScenarioSettings(),
@@ -186,7 +183,6 @@ paths:
             )
         ]
         scenario = ParsedScenario(
-            version="1.0",
             name="Test",
             description=None,
             settings=ScenarioSettings(),
@@ -215,7 +211,6 @@ paths:
             )
         ]
         scenario = ParsedScenario(
-            version="1.0",
             name="Test",
             description=None,
             settings=ScenarioSettings(),
@@ -239,7 +234,6 @@ paths:
             )
         ]
         scenario = ParsedScenario(
-            version="1.0",
             name="Test",
             description=None,
             settings=ScenarioSettings(),
@@ -264,7 +258,6 @@ paths:
             )
         ]
         scenario = ParsedScenario(
-            version="1.0",
             name="Test",
             description=None,
             settings=ScenarioSettings(),
@@ -290,7 +283,6 @@ paths:
             )
         ]
         scenario = ParsedScenario(
-            version="1.0",
             name="Test",
             description=None,
             settings=ScenarioSettings(),
@@ -318,7 +310,6 @@ paths:
             )
         ]
         scenario = ParsedScenario(
-            version="1.0",
             name="Test",
             description=None,
             settings=ScenarioSettings(),
@@ -348,7 +339,6 @@ paths:
             ),
         ]
         scenario = ParsedScenario(
-            version="1.0",
             name="Test",
             description=None,
             settings=ScenarioSettings(),
@@ -427,7 +417,6 @@ paths:
             )
         ]
         scenario = ParsedScenario(
-            version="1.0",
             name="Test",
             description=None,
             settings=ScenarioSettings(),
@@ -453,7 +442,6 @@ paths:
             )
         ]
         scenario = ParsedScenario(
-            version="1.0",
             name="Test",
             description=None,
             settings=ScenarioSettings(),

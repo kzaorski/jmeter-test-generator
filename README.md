@@ -7,6 +7,10 @@ Generate JMeter JMX test plans from OpenAPI specifications.
 - Automatic OpenAPI/Swagger spec detection in projects
 - **Multi-spec selection** - Choose which spec to use when multiple are found
 - Support for OpenAPI 3.x (3.0.0 - 3.1.x) and Swagger 2.0
+- **Scenario-based testing** - Define sequential user flows with pt_scenario.yaml
+- **Variable capture & correlation** - Extract response values for subsequent steps
+- **Interactive wizard** - `jmeter-gen new scenario` for guided scenario creation
+- **Scenario visualization** - Terminal and Mermaid diagram output
 - Generate JMX files with HTTP samplers, assertions, and listeners
 - Dual mode: CLI and MCP Server (GitHub Copilot integration)
 - Rich terminal output with tables and formatting
@@ -82,6 +86,9 @@ jmeter-gen generate --threads 50 --rampup 10 --duration 300 --output load-test.j
 
 # Validate existing JMX
 jmeter-gen validate performance-test.jmx
+
+# Create scenario interactively (wizard)
+jmeter-gen new scenario
 ```
 
 ### MCP Server Mode (GitHub Copilot)
@@ -116,10 +123,18 @@ Both modes share the same core logic.
 
 ## Documentation
 
-- [Implementation Plan](docs/IMPLEMENTATION_PLAN.md)
-- [Architecture](docs/ARCHITECTURE.md)
-- [Development Guide](docs/DEVELOPMENT.md)
-- [Core Modules](docs/CORE_MODULES.md)
+- [Quick Start Guide](QUICKSTART.md) - 5-minute getting started
+- [Changelog](CHANGELOG.md) - Version history
+
+### Feature Documentation
+- [Scenario Wizard](docs/v3/README.md) - Interactive wizard for creating scenarios
+- [Scenario Specification](docs/v2/PT_SCENARIO_SPEC.md) - pt_scenario.yaml format
+- [Scenario Testing](docs/v2/README.md) - Scenario-based test generation
+
+### Developer Documentation
+- [Architecture](docs/v1/ARCHITECTURE.md)
+- [Development Guide](docs/v1/DEVELOPMENT.md)
+- [Core Modules](docs/v2/CORE_MODULES.md)
 
 ## Project Structure
 
@@ -131,9 +146,15 @@ app/
 │   │   ├── openapi_parser.py
 │   │   ├── jmx_generator.py
 │   │   ├── jmx_validator.py
-│   │   ├── spec_comparator.py   # Change detection
-│   │   ├── snapshot_manager.py  # Snapshot management
-│   │   └── jmx_updater.py       # JMX updates
+│   │   ├── spec_comparator.py      # Change detection
+│   │   ├── snapshot_manager.py     # Snapshot management
+│   │   ├── jmx_updater.py          # JMX updates
+│   │   ├── ptscenario_parser.py    # Scenario parsing
+│   │   ├── correlation_analyzer.py # Auto-correlation
+│   │   ├── scenario_jmx_generator.py # Scenario JMX
+│   │   ├── scenario_visualizer.py  # Terminal visualization
+│   │   ├── scenario_mermaid.py     # Mermaid diagrams
+│   │   └── scenario_wizard.py      # Interactive wizard
 │   ├── cli.py               # CLI interface
 │   └── mcp_server.py        # MCP Server interface
 ├── tests/                   # Unit and integration tests

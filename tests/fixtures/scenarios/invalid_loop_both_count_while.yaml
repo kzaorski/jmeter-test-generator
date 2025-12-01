@@ -1,4 +1,3 @@
-version: "1.0"
 name: "Invalid Loop - Both count and while"
 description: "Invalid: cannot have both count and while"
 

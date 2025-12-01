@@ -113,7 +113,7 @@ class ScenarioJMXGenerator:
             main_hashtree = ET.SubElement(jmeter_test_plan, "hashTree")
 
             # Test Plan
-            test_plan = self._create_test_plan(scenario.name, scenario.version)
+            test_plan = self._create_test_plan(scenario.name)
             main_hashtree.append(test_plan)
 
             test_plan_hashtree = ET.SubElement(main_hashtree, "hashTree")
@@ -143,6 +143,7 @@ class ScenarioJMXGenerator:
                 scenario.settings.threads,
                 scenario.settings.rampup,
                 scenario.settings.duration,
+                scenario.settings.loops,
             )
             test_plan_hashtree.append(thread_group)
 
@@ -155,8 +156,64 @@ class ScenarioJMXGenerator:
             loops_created = 0
             transactions_created = 0
 
+            # Track variables for substitution in payloads
+            # Start with scenario-level variables, then add captured vars as we go
+            available_vars: set[str] = set(scenario.variables.keys()) if scenario.variables else set()
+
             for step_index, step in enumerate(scenario.steps, start=1):
                 if not step.enabled:
+                    continue
+
+                # Handle think_time step - add ConstantTimer directly
+                if step.endpoint_type == "think_time" and step.think_time is not None:
+                    timer = self._create_constant_timer(step.think_time)
+                    thread_group_hashtree.append(timer)
+                    ET.SubElement(thread_group_hashtree, "hashTree")
+                    continue
+
+                # Handle multi-step loop block
+                if step.endpoint_type == "loop_block" and step.nested_steps:
+                    # Create loop controller
+                    if step.loop and step.loop.count:
+                        loop_controller = self._create_loop_controller(step.name, step.loop.count)
+                    elif step.loop and step.loop.while_condition:
+                        loop_controller = self._create_while_controller(
+                            step.name,
+                            step.loop.while_condition,
+                            step.loop.max_iterations,
+                        )
+                    else:
+                        continue  # Invalid loop block
+
+                    thread_group_hashtree.append(loop_controller)
+                    loop_hashtree = ET.SubElement(thread_group_hashtree, "hashTree")
+                    loops_created += 1
+
+                    # Add nested steps inside loop
+                    # Track variables captured within nested steps for subsequent nested steps
+                    for nested_idx, nested_step in enumerate(step.nested_steps, start=1):
+                        result = self._add_step_to_parent(
+                            nested_step,
+                            loop_hashtree,
+                            f"{step_index}.{nested_idx}",
+                            mapping_by_step,
+                            step_index,  # Use parent step index for correlation mapping
+                            available_vars,  # Pass available vars for payload substitution
+                        )
+                        samplers_created += result["samplers"]
+                        extractors_created += result["extractors"]
+                        assertions_created += result["assertions"]
+                        transactions_created += result["transactions"]
+                        # Add captured variables for subsequent nested steps
+                        for var_name in result.get("captured_vars", []):
+                            available_vars.add(var_name)
+
+                    # Add interval timer at end of loop if specified
+                    if step.loop and step.loop.interval:
+                        timer = self._create_constant_timer(step.loop.interval)
+                        loop_hashtree.append(timer)
+                        ET.SubElement(loop_hashtree, "hashTree")
+
                     continue
 
                 # Get correlation mappings for this step
@@ -197,7 +254,7 @@ class ScenarioJMXGenerator:
                 transactions_created += 1
 
                 # Create HTTP Sampler inside Transaction Controller
-                sampler = self._create_step_sampler(step, endpoint_data, step_index)
+                sampler = self._create_step_sampler(step, endpoint_data, step_index, available_vars)
                 tc_hashtree.append(sampler)
                 samplers_created += 1
 
@@ -225,12 +282,6 @@ class ScenarioJMXGenerator:
                         ET.SubElement(sampler_hashtree, "hashTree")
                         extractors_created += 1
 
-                # Add constant timer for loop interval
-                if step.loop and step.loop.interval:
-                    timer = self._create_constant_timer(step.loop.interval)
-                    sampler_hashtree.append(timer)
-                    ET.SubElement(sampler_hashtree, "hashTree")
-
                 # Add assertions
                 if step.assertions:
                     assertion_elements = self._create_response_assertions(step.assertions)
@@ -238,6 +289,16 @@ class ScenarioJMXGenerator:
                         sampler_hashtree.append(assertion)
                         ET.SubElement(sampler_hashtree, "hashTree")
                         assertions_created += 1
+
+                # Collect captured variables for subsequent steps
+                for mapping in step_mappings:
+                    available_vars.add(mapping.variable_name)
+
+                # Add constant timer for loop interval (at loop level, after transaction)
+                if step.loop and step.loop.interval:
+                    timer = self._create_constant_timer(step.loop.interval)
+                    loop_hashtree.append(timer)
+                    ET.SubElement(loop_hashtree, "hashTree")
 
             # Convert to pretty XML and write
             xml_string = self._prettify_xml(jmeter_test_plan)
@@ -262,37 +323,194 @@ class ScenarioJMXGenerator:
                 raise
             raise JMXGenerationException(f"Failed to generate scenario JMX: {e}") from e
 
+    def _add_step_to_parent(
+        self,
+        step: ScenarioStep,
+        parent_hashtree: ET.Element,
+        step_label: str,
+        mapping_by_step: dict,
+        parent_step_index: int,
+        available_vars: Optional[set[str]] = None,
+    ) -> dict[str, Any]:
+        """Add a step (sampler or timer) to a parent hashtree.
+
+        Args:
+            step: The step to add
+            parent_hashtree: Parent XML element to add to
+            step_label: Label for the step (e.g., "2.1")
+            mapping_by_step: Correlation mappings by step index
+            parent_step_index: Parent step index for correlation lookup
+            available_vars: Set of variable names available for substitution
+
+        Returns:
+            Dict with counts and captured variables:
+            - samplers, extractors, assertions, transactions: int counts
+            - captured_vars: list of variable names captured in this step
+        """
+        result: dict[str, Any] = {
+            "samplers": 0,
+            "extractors": 0,
+            "assertions": 0,
+            "transactions": 0,
+            "captured_vars": [],
+        }
+
+        # Handle think_time step
+        if step.endpoint_type == "think_time" and step.think_time is not None:
+            timer = self._create_constant_timer(step.think_time)
+            parent_hashtree.append(timer)
+            ET.SubElement(parent_hashtree, "hashTree")
+            return result
+
+        # Resolve endpoint
+        endpoint_data = self._resolve_endpoint(step)
+
+        # Create Transaction Controller
+        tc_name = f"Step {step_label}: {step.name}"
+        transaction_controller = self._create_transaction_controller(tc_name)
+        parent_hashtree.append(transaction_controller)
+        tc_hashtree = ET.SubElement(parent_hashtree, "hashTree")
+        result["transactions"] = 1
+
+        # Create HTTP Sampler
+        sampler = self._create_step_sampler(step, endpoint_data, parent_step_index, available_vars)
+        tc_hashtree.append(sampler)
+        result["samplers"] = 1
+
+        # Sampler hashTree for children
+        sampler_hashtree = ET.SubElement(tc_hashtree, "hashTree")
+
+        # Add Header Manager if headers present
+        if step.headers:
+            header_mgr = self._create_header_manager(step.headers)
+            sampler_hashtree.append(header_mgr)
+            ET.SubElement(sampler_hashtree, "hashTree")
+
+        # Add JSONPostProcessor for captures defined in step
+        if step.captures:
+            for capture in step.captures:
+                # Create a simple mapping for inline captures
+                mapping = CorrelationMapping(
+                    step_index=parent_step_index,
+                    capture_name=capture.variable_name,
+                    jsonpath=capture.jsonpath or f"$.{capture.source_field or capture.variable_name}",
+                    match=capture.match,
+                    confidence=1.0,
+                )
+                extractor = self._create_json_post_processor(mapping)
+                sampler_hashtree.append(extractor)
+                ET.SubElement(sampler_hashtree, "hashTree")
+                result["extractors"] += 1
+                # Track captured variable for subsequent steps
+                result["captured_vars"].append(capture.variable_name)
+
+        # Add assertions
+        if step.assertions:
+            assertion_elements = self._create_response_assertions(step.assertions)
+            for assertion in assertion_elements:
+                sampler_hashtree.append(assertion)
+                ET.SubElement(sampler_hashtree, "hashTree")
+                result["assertions"] += 1
+
+        return result
+
     def _resolve_endpoint(self, step: ScenarioStep) -> dict[str, Any]:
-        """Resolve endpoint to get path and method."""
+        """Resolve endpoint to get path, method, and request body schema."""
         if step.endpoint_type == "operation_id":
             endpoint = self.openapi_parser.get_endpoint_by_operation_id(step.endpoint)
             if endpoint:
+                operation = endpoint.get("operation", {})
                 return {
                     "path": endpoint["path"],
                     "method": endpoint["method"],
-                    "operation": endpoint.get("operation", {}),
+                    "operation": operation,
+                    "request_body_schema": self._extract_request_body_schema(operation),
                 }
             # Fallback if not found in spec
             return {
                 "path": f"/{step.endpoint}",
                 "method": "GET",
                 "operation": {},
+                "request_body_schema": None,
             }
         else:
-            # method_path type
+            # method_path type - also look up endpoint in spec
+            endpoint = self.openapi_parser.get_endpoint_by_method_path(
+                step.method or "GET", step.path or "/"
+            )
+            operation = endpoint.get("operation", {}) if endpoint else {}
             return {
                 "path": step.path or "/",
                 "method": step.method or "GET",
-                "operation": {},
+                "operation": operation,
+                "request_body_schema": self._extract_request_body_schema(operation),
             }
+
+    def _extract_request_body_schema(self, operation: dict) -> Optional[dict]:
+        """Extract request body schema from OpenAPI operation.
+
+        Args:
+            operation: OpenAPI operation object
+
+        Returns:
+            Resolved request body schema or None
+        """
+        request_body = operation.get("requestBody", {})
+        content = request_body.get("content", {})
+        json_content = content.get("application/json", {})
+        schema = json_content.get("schema")
+        if schema:
+            return self.openapi_parser._resolve_schema_ref(schema)
+        return None
+
+    def _substitute_captured_vars(
+        self, payload: dict, available_vars: set[str]
+    ) -> dict:
+        """Replace field values with ${var} if field name matches an available variable.
+
+        This enables automatic correlation between steps when auto-generating
+        request bodies from OpenAPI schemas. Available variables include:
+        - Scenario-level variables defined in the 'variables' section
+        - Variables captured from responses in previous steps
+
+        Args:
+            payload: Dictionary payload to process
+            available_vars: Set of variable names available for substitution
+
+        Returns:
+            New dictionary with matched field values replaced by ${var_name}
+        """
+        result = {}
+        for key, value in payload.items():
+            if key in available_vars:
+                result[key] = f"${{{key}}}"
+            elif isinstance(value, dict):
+                result[key] = self._substitute_captured_vars(value, available_vars)
+            elif isinstance(value, list):
+                result[key] = [
+                    self._substitute_captured_vars(item, available_vars)
+                    if isinstance(item, dict) else item
+                    for item in value
+                ]
+            else:
+                result[key] = value
+        return result
 
     def _create_step_sampler(
         self,
         step: ScenarioStep,
         endpoint_data: dict[str, Any],
         step_index: int,
+        captured_vars: Optional[set[str]] = None,
     ) -> ET.Element:
-        """Create HTTP Sampler for scenario step."""
+        """Create HTTP Sampler for scenario step.
+
+        Args:
+            step: Scenario step definition
+            endpoint_data: Resolved endpoint information
+            step_index: Step index for labeling
+            captured_vars: Set of variable names captured in previous steps
+        """
         path = endpoint_data["path"]
         method = endpoint_data["method"]
 
@@ -348,8 +566,18 @@ class ScenarioJMXGenerator:
         ET.SubElement(sampler, "boolProp", {"name": "HTTPSampler.auto_redirects"}).text = "false"
 
         # Request body
-        if step.payload:
-            payload_json = json.dumps(step.payload, indent=2)
+        payload_to_use = step.payload
+        if not payload_to_use and endpoint_data.get("request_body_schema"):
+            # Auto-generate sample body from OpenAPI schema (like v1)
+            payload_to_use = self.openapi_parser.generate_sample_body(
+                endpoint_data["request_body_schema"]
+            )
+            # Substitute captured variables in auto-generated payload
+            if payload_to_use and captured_vars:
+                payload_to_use = self._substitute_captured_vars(payload_to_use, captured_vars)
+
+        if payload_to_use:
+            payload_json = json.dumps(payload_to_use, indent=2)
             ET.SubElement(sampler, "boolProp", {"name": "HTTPSampler.postBodyRaw"}).text = "true"
 
             body_elem = ET.SubElement(
@@ -589,14 +817,14 @@ class ScenarioJMXGenerator:
         lines = [line for line in pretty_xml.split("\n") if line.strip()]
         return "\n".join(lines)
 
-    def _create_test_plan(self, title: str, version: str) -> ET.Element:
+    def _create_test_plan(self, title: str) -> ET.Element:
         """Create Test Plan element."""
         test_plan = ET.Element(
             "TestPlan",
             {
                 "guiclass": "TestPlanGui",
                 "testclass": "TestPlan",
-                "testname": f"{title} v{version}",
+                "testname": title,
                 "enabled": "true",
             },
         )
@@ -619,9 +847,20 @@ class ScenarioJMXGenerator:
         return test_plan
 
     def _create_thread_group(
-        self, threads: int, rampup: int, duration: Optional[int]
+        self,
+        threads: int,
+        rampup: int,
+        duration: Optional[int],
+        loops: Optional[int] = None,
     ) -> ET.Element:
-        """Create Thread Group element."""
+        """Create Thread Group element.
+
+        Args:
+            threads: Number of concurrent threads
+            rampup: Ramp-up period in seconds
+            duration: Test duration in seconds (used when loops is infinite)
+            loops: Number of iterations (None=auto, 0/-1=infinite, N=fixed count)
+        """
         thread_group = ET.Element(
             "ThreadGroup",
             {
@@ -635,16 +874,33 @@ class ScenarioJMXGenerator:
         ET.SubElement(thread_group, "stringProp", {"name": "ThreadGroup.num_threads"}).text = str(threads)
         ET.SubElement(thread_group, "stringProp", {"name": "ThreadGroup.ramp_time"}).text = str(rampup)
 
-        if duration:
+        # Determine loop count and scheduler settings
+        # Priority: loops > 0 takes precedence, then duration, then default (1)
+        if loops is not None and loops > 0:
+            # Fixed iteration count - ignore duration, no scheduler
+            loop_count = str(loops)
+            use_scheduler = False
+        elif loops is not None and loops <= 0:
+            # Explicit infinite (0 or -1) - use duration with scheduler
+            loop_count = "-1"
+            use_scheduler = bool(duration)
+        elif duration:
+            # No loops specified but duration given - infinite with scheduler
+            loop_count = "-1"
+            use_scheduler = True
+        else:
+            # Default - single iteration
+            loop_count = "1"
+            use_scheduler = False
+
+        if use_scheduler and duration:
             ET.SubElement(thread_group, "stringProp", {"name": "ThreadGroup.duration"}).text = str(duration)
             ET.SubElement(thread_group, "stringProp", {"name": "ThreadGroup.delay"}).text = "0"
             ET.SubElement(thread_group, "boolProp", {"name": "ThreadGroup.scheduler"}).text = "true"
-            loop_count = "-1"
         else:
             ET.SubElement(thread_group, "stringProp", {"name": "ThreadGroup.duration"}).text = ""
             ET.SubElement(thread_group, "stringProp", {"name": "ThreadGroup.delay"}).text = ""
             ET.SubElement(thread_group, "boolProp", {"name": "ThreadGroup.scheduler"}).text = "false"
-            loop_count = "1"
 
         loop_controller = ET.SubElement(
             thread_group,

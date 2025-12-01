@@ -87,6 +87,10 @@ class ScenarioVisualizer:
                     self.console.print(f"         [dim]| {var_names}[/dim]")
                     self.console.print(f"         [dim]v[/dim]")
 
+        # Legend for confidence indicators
+        if correlation_result and correlation_result.mappings:
+            self._render_legend()
+
         # Variable flow table
         if correlation_result and correlation_result.mappings:
             self.console.print()
@@ -104,6 +108,12 @@ class ScenarioVisualizer:
 
         parts.append(f"Threads: {settings.threads}")
         parts.append(f"Ramp-up: {settings.rampup}s")
+
+        if settings.loops is not None:
+            if settings.loops > 0:
+                parts.append(f"Loops: {settings.loops}")
+            else:
+                parts.append("Loops: infinite")
 
         if settings.duration:
             parts.append(f"Duration: {settings.duration}s")
@@ -126,7 +136,59 @@ class ScenarioVisualizer:
         # Build content
         content = Text()
 
-        # Endpoint line
+        # Handle think_time steps
+        if step.endpoint_type == "think_time":
+            content.append(f"think_time: {step.think_time}ms", style="magenta")
+            return Panel(
+                content,
+                title=f"[{index}] {step.name}",
+                title_align="left",
+                border_style="magenta",
+                padding=(0, 1),
+            )
+
+        # Handle loop_block (multi-step loop)
+        if step.endpoint_type == "loop_block" and step.nested_steps:
+            # Loop header
+            if step.loop and step.loop.count:
+                content.append(f"loop: count={step.loop.count}", style="magenta")
+            elif step.loop and step.loop.while_condition:
+                content.append(f"loop: while={step.loop.while_condition}, max={step.loop.max_iterations}", style="magenta")
+            if step.loop and step.loop.interval:
+                interval_sec = step.loop.interval / 1000
+                if interval_sec >= 1:
+                    interval_str = f"{interval_sec:.0f}s" if interval_sec == int(interval_sec) else f"{interval_sec}s"
+                else:
+                    interval_str = f"{step.loop.interval}ms"
+                content.append(f", interval={interval_str}", style="magenta")
+
+            # Nested steps
+            for nested_idx, nested_step in enumerate(step.nested_steps, start=1):
+                content.append(f"\n  [{nested_idx}] ", style="dim")
+                if nested_step.endpoint_type == "think_time":
+                    content.append(f"think_time: {nested_step.think_time}ms", style="dim magenta")
+                elif nested_step.endpoint_type == "method_path":
+                    method_color = self._get_method_color(nested_step.method or "GET")
+                    content.append(f"{nested_step.method} ", style=f"bold {method_color}")
+                    content.append(nested_step.path or nested_step.endpoint, style="dim")
+                else:
+                    content.append(nested_step.endpoint, style="dim cyan")
+                if nested_step.captures:
+                    content.append(" -> ", style="dim")
+                    content.append(
+                        ", ".join(c.variable_name for c in nested_step.captures),
+                        style="yellow dim",
+                    )
+
+            return Panel(
+                content,
+                title=f"[{index}] {step.name}",
+                title_align="left",
+                border_style="magenta",
+                padding=(0, 1),
+            )
+
+        # Endpoint line (regular steps)
         if step.endpoint_type == "method_path":
             method_color = self._get_method_color(step.method or "GET")
             content.append(f"{step.method} ", style=f"bold {method_color}")
@@ -150,13 +212,12 @@ class ScenarioVisualizer:
         if mappings:
             content.append("\n")
             content.append("capture: ", style="yellow")
-            capture_parts = []
-            for m in mappings:
-                confidence_indicator = self._get_confidence_indicator(m.confidence)
-                capture_parts.append(
-                    f"{m.variable_name} ({m.jsonpath}) {confidence_indicator}"
-                )
-            content.append(", ".join(capture_parts), style="yellow")
+            for i, m in enumerate(mappings):
+                if i > 0:
+                    content.append(", ", style="yellow")
+                content.append(f"{m.variable_name} ({m.jsonpath}) ", style="yellow")
+                conf_style, conf_label = self._get_confidence_style(m.confidence)
+                content.append(conf_label, style=conf_style)
         elif step.captures:
             content.append("\n")
             content.append("capture: ", style="yellow")
@@ -172,7 +233,7 @@ class ScenarioVisualizer:
             if step.assertions.status:
                 content.append(f"status={step.assertions.status}", style="green")
 
-        # Loop configuration
+        # Loop configuration (single-step loop)
         if step.loop:
             content.append("\n")
             content.append("loop: ", style="magenta")
@@ -242,6 +303,16 @@ class ScenarioVisualizer:
 
         return table
 
+    def _render_legend(self) -> None:
+        """Render legend for confidence indicators."""
+        self.console.print()
+        self.console.print("[dim]Legend: JSONPath auto-detection confidence[/dim]")
+        self.console.print(
+            "  [green][HIGH][/green] exact match  "
+            "[yellow][MED][/yellow] partial match  "
+            "[red][LOW][/red] uncertain"
+        )
+
     def _render_correlation_issues(
         self, correlation_result: CorrelationResult
     ) -> None:
@@ -272,13 +343,22 @@ class ScenarioVisualizer:
         return colors.get(method.upper(), "white")
 
     def _get_confidence_indicator(self, confidence: float) -> str:
-        """Get short confidence indicator."""
+        """Get short confidence indicator (for markup contexts)."""
         if confidence >= 0.9:
             return "[green][HIGH][/green]"
         elif confidence >= 0.7:
             return "[yellow][MED][/yellow]"
         else:
             return "[red][LOW][/red]"
+
+    def _get_confidence_style(self, confidence: float) -> tuple[str, str]:
+        """Get confidence style and label for Text.append()."""
+        if confidence >= 0.9:
+            return ("green", "[HIGH]")
+        elif confidence >= 0.7:
+            return ("yellow", "[MED]")
+        else:
+            return ("red", "[LOW]")
 
     def _get_confidence_display(self, confidence: float) -> str:
         """Get confidence display for table."""

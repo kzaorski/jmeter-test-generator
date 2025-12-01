@@ -1,4 +1,3 @@
-version: "1.0"
 name: "OperationId Format Only"
 description: "All endpoints use operationId format"
 

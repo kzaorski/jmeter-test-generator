@@ -118,7 +118,33 @@ def _build_node_label(
     # Escape special characters for Mermaid
     name = _escape_mermaid(step.name)
 
-    # Build endpoint string
+    # Handle think_time steps
+    if step.endpoint_type == "think_time":
+        return f"{step_number}. {name}<br/>think_time: {step.think_time}ms"
+
+    # Handle loop_block (multi-step loop)
+    if step.endpoint_type == "loop_block" and step.nested_steps:
+        if step.loop and step.loop.count:
+            loop_info = f"loop: {step.loop.count}x"
+        elif step.loop and step.loop.while_condition:
+            loop_info = f"while: {_escape_mermaid(step.loop.while_condition)}"
+        else:
+            loop_info = "loop"
+
+        # List nested steps
+        nested_labels = []
+        for nested_step in step.nested_steps:
+            if nested_step.endpoint_type == "think_time":
+                nested_labels.append(f"think_time: {nested_step.think_time}ms")
+            elif nested_step.endpoint_type == "method_path" and nested_step.method:
+                nested_labels.append(f"{nested_step.method} {nested_step.path}")
+            else:
+                nested_labels.append(nested_step.endpoint)
+
+        nested_str = "<br/>".join(_escape_mermaid(n) for n in nested_labels)
+        return f"{step_number}. {name}<br/>{loop_info}<br/>{nested_str}"
+
+    # Build endpoint string for regular steps
     if step.endpoint_type == "method_path" and step.method and step.path:
         endpoint = f"{step.method} {step.path}"
     else:
@@ -211,8 +237,27 @@ def generate_text_visualization(
     for idx, step in enumerate(scenario.steps, 1):
         lines.append(f"[{idx}] {step.name}")
 
-        # Endpoint
-        if step.endpoint_type == "method_path" and step.method and step.path:
+        # Handle think_time steps
+        if step.endpoint_type == "think_time":
+            lines.append(f"    think_time: {step.think_time}ms")
+        # Handle loop_block (multi-step loop)
+        elif step.endpoint_type == "loop_block" and step.nested_steps:
+            if step.loop and step.loop.count:
+                lines.append(f"    loop: {step.loop.count}x")
+            elif step.loop and step.loop.while_condition:
+                lines.append(f"    while: {step.loop.while_condition}")
+            for nested_idx, nested_step in enumerate(step.nested_steps, 1):
+                if nested_step.endpoint_type == "think_time":
+                    lines.append(f"      [{nested_idx}] {nested_step.name}: {nested_step.think_time}ms")
+                elif nested_step.endpoint_type == "method_path" and nested_step.method:
+                    lines.append(f"      [{nested_idx}] {nested_step.method} {nested_step.path}")
+                else:
+                    lines.append(f"      [{nested_idx}] {nested_step.endpoint}")
+                if nested_step.captures:
+                    caps = ", ".join(c.variable_name for c in nested_step.captures)
+                    lines.append(f"          Captures: {caps}")
+        # Endpoint (regular step)
+        elif step.endpoint_type == "method_path" and step.method and step.path:
             lines.append(f"    {step.method} {step.path}")
         else:
             lines.append(f"    {step.endpoint}")

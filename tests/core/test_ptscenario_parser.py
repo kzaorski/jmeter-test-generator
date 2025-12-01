@@ -34,7 +34,6 @@ class TestPtScenarioParser:
         """Test parsing a minimal valid scenario."""
         scenario = parser.parse(fixtures_dir / "valid_basic.yaml")
 
-        assert scenario.version == "1.0"
         assert scenario.name == "Basic Test Scenario"
         assert scenario.description is None or scenario.description == ""
         assert len(scenario.steps) > 0
@@ -43,7 +42,6 @@ class TestPtScenarioParser:
         """Test parsing a scenario with all features."""
         scenario = parser.parse(fixtures_dir / "valid_full.yaml")
 
-        assert scenario.version == "1.0"
         assert scenario.name == "Full Feature Scenario"
         assert scenario.description is not None
         assert scenario.settings.threads == 10
@@ -132,14 +130,6 @@ class TestPtScenarioParser:
             parser.parse(fixtures_dir / "invalid_yaml_syntax.yaml")
 
         assert "YAML" in str(exc_info.value) or "parse" in str(exc_info.value).lower()
-
-    def test_parse_invalid_missing_version(self, parser, fixtures_dir):
-        """Test parsing scenario missing version field."""
-        # Missing required fields raise ScenarioParseException during parsing
-        with pytest.raises(ScenarioParseException) as exc_info:
-            parser.parse(fixtures_dir / "invalid_missing_version.yaml")
-
-        assert "version" in str(exc_info.value).lower()
 
     def test_parse_invalid_missing_name(self, parser, fixtures_dir):
         """Test parsing scenario missing name field."""
@@ -448,3 +438,186 @@ scenario:
         assert loop_dict["max_iterations"] == 50
         assert loop_dict["interval"] == 10000
         assert loop_dict["count"] is None
+
+
+class TestMultiStepLoopParsing:
+    """Tests for multi-step loop parsing."""
+
+    @pytest.fixture
+    def parser(self):
+        """Create a parser instance."""
+        return PtScenarioParser()
+
+    @pytest.fixture
+    def fixtures_dir(self):
+        """Return the path to test fixtures directory."""
+        return Path(__file__).parent.parent / "fixtures" / "scenarios"
+
+    def test_parse_multi_step_loop_count(self, parser, fixtures_dir):
+        """Test parsing multi-step loop with fixed count."""
+        scenario = parser.parse(fixtures_dir / "valid_multi_step_loop.yaml")
+
+        # Find the loop block step
+        loop_step = scenario.steps[1]
+        assert loop_step.endpoint_type == "loop_block"
+        assert loop_step.loop is not None
+        assert loop_step.loop.count == 5
+        assert loop_step.loop.interval == 1000
+
+        # Check nested steps
+        assert len(loop_step.nested_steps) == 3
+        assert loop_step.nested_steps[0].name == "Check Status"
+        assert loop_step.nested_steps[0].endpoint == "GET /orders/${orderId}/status"
+        assert loop_step.nested_steps[1].endpoint_type == "think_time"
+        assert loop_step.nested_steps[1].think_time == 500
+        assert loop_step.nested_steps[2].name == "Get Details"
+
+    def test_parse_multi_step_loop_while(self, parser, fixtures_dir):
+        """Test parsing multi-step loop with while condition."""
+        scenario = parser.parse(fixtures_dir / "valid_multi_step_loop_while.yaml")
+
+        loop_step = scenario.steps[1]
+        assert loop_step.endpoint_type == "loop_block"
+        assert loop_step.loop.while_condition == "$.status != 'completed'"
+        assert loop_step.loop.max_iterations == 50
+        assert loop_step.loop.interval == 2000
+
+        # Check nested steps
+        assert len(loop_step.nested_steps) == 2
+        assert loop_step.nested_steps[0].endpoint == "GET /jobs/${jobId}/status"
+        assert loop_step.nested_steps[1].endpoint == "POST /jobs/${jobId}/log"
+
+    def test_parse_multi_step_loop_name_defaults(self, parser, tmp_path):
+        """Test that loop block generates default name."""
+        scenario_content = """version: "1.0"
+name: "Test"
+scenario:
+  - loop:
+      count: 3
+    steps:
+      - name: "Step A"
+        endpoint: "GET /test"
+"""
+        scenario_file = tmp_path / "loop_name.yaml"
+        scenario_file.write_text(scenario_content)
+
+        scenario = parser.parse(scenario_file)
+        loop_step = scenario.steps[0]
+        assert loop_step.name == "Loop 3x"
+        assert loop_step.endpoint_type == "loop_block"
+
+    def test_parse_multi_step_loop_custom_name(self, parser, tmp_path):
+        """Test multi-step loop with custom name."""
+        scenario_content = """version: "1.0"
+name: "Test"
+scenario:
+  - name: "My Custom Loop"
+    loop:
+      count: 5
+    steps:
+      - name: "Inner Step"
+        endpoint: "GET /test"
+"""
+        scenario_file = tmp_path / "loop_custom_name.yaml"
+        scenario_file.write_text(scenario_content)
+
+        scenario = parser.parse(scenario_file)
+        loop_step = scenario.steps[0]
+        assert loop_step.name == "My Custom Loop"
+
+    def test_parse_multi_step_loop_nested_captures(self, parser, fixtures_dir):
+        """Test that captures in nested steps are parsed correctly."""
+        scenario = parser.parse(fixtures_dir / "valid_multi_step_loop.yaml")
+
+        loop_step = scenario.steps[1]
+        nested_step = loop_step.nested_steps[0]
+
+        assert len(nested_step.captures) == 1
+        assert nested_step.captures[0].variable_name == "status"
+
+    def test_parse_multi_step_loop_empty_steps_error(self, parser, tmp_path):
+        """Test that empty steps list in loop block raises error."""
+        scenario_content = """version: "1.0"
+name: "Test"
+scenario:
+  - loop:
+      count: 5
+    steps: []
+"""
+        scenario_file = tmp_path / "empty_loop_steps.yaml"
+        scenario_file.write_text(scenario_content)
+
+        with pytest.raises(ScenarioValidationException) as exc_info:
+            parser.parse(scenario_file)
+
+        assert "steps" in str(exc_info.value).lower() or "non-empty" in str(exc_info.value).lower()
+
+    def test_multi_step_loop_to_dict(self, parser, fixtures_dir):
+        """Test ScenarioStep.to_dict() for loop blocks."""
+        scenario = parser.parse(fixtures_dir / "valid_multi_step_loop.yaml")
+
+        loop_step = scenario.steps[1]
+        step_dict = loop_step.to_dict()
+
+        assert step_dict["endpoint_type"] == "loop_block"
+        assert step_dict["loop"]["count"] == 5
+        assert len(step_dict["nested_steps"]) == 3
+        assert step_dict["nested_steps"][0]["name"] == "Check Status"
+
+
+class TestThinkTimeParsing:
+    """Tests for think_time step parsing."""
+
+    @pytest.fixture
+    def parser(self):
+        """Create a parser instance."""
+        return PtScenarioParser()
+
+    def test_parse_think_time_step(self, parser, tmp_path):
+        """Test parsing standalone think_time step."""
+        scenario_content = """version: "1.0"
+name: "Test"
+scenario:
+  - name: "Wait"
+    think_time: 5000
+"""
+        scenario_file = tmp_path / "think_time.yaml"
+        scenario_file.write_text(scenario_content)
+
+        scenario = parser.parse(scenario_file)
+        step = scenario.steps[0]
+
+        assert step.endpoint_type == "think_time"
+        assert step.think_time == 5000
+        assert step.name == "Wait"
+
+    def test_parse_think_time_default_name(self, parser, tmp_path):
+        """Test think_time step with default name."""
+        scenario_content = """version: "1.0"
+name: "Test"
+scenario:
+  - think_time: 1000
+"""
+        scenario_file = tmp_path / "think_time_default.yaml"
+        scenario_file.write_text(scenario_content)
+
+        scenario = parser.parse(scenario_file)
+        step = scenario.steps[0]
+
+        assert step.name == "Think Time"
+        assert step.think_time == 1000
+
+    def test_parse_think_time_invalid_negative(self, parser, tmp_path):
+        """Test that negative think_time raises error."""
+        scenario_content = """version: "1.0"
+name: "Test"
+scenario:
+  - think_time: -100
+"""
+        scenario_file = tmp_path / "think_time_negative.yaml"
+        scenario_file.write_text(scenario_content)
+
+        with pytest.raises(ScenarioValidationException) as exc_info:
+            parser.parse(scenario_file)
+
+        assert "think_time" in str(exc_info.value).lower()

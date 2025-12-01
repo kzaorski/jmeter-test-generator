@@ -1,4 +1,3 @@
-version: "1.0"
 name: "Full Feature Scenario"
 description: "Tests all supported features including captures and assertions"
 

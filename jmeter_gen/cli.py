@@ -32,6 +32,9 @@ from jmeter_gen.core.correlation_analyzer import CorrelationAnalyzer
 from jmeter_gen.core.scenario_visualizer import ScenarioVisualizer
 from jmeter_gen.core.scenario_jmx_generator import ScenarioJMXGenerator
 
+# v3 imports
+from jmeter_gen.core.scenario_wizard import ScenarioWizard
+
 console = Console()
 
 
@@ -79,7 +82,7 @@ def _get_spec_status(spec_path: str) -> str:
 
 
 @click.group()
-@click.version_option(version="2.1.1", prog_name="jmeter-gen")
+@click.version_option(version="3.0.0", prog_name="jmeter-gen")
 def cli():
     """JMeter Test Generator - Generate JMX test plans from OpenAPI specifications.
 
@@ -783,6 +786,124 @@ def mcp():
     except Exception as e:
         console.print(f"\n[bold red]Error starting MCP server:[/bold red] {e}")
         sys.exit(1)
+
+
+@cli.group()
+def new():
+    """Create new resources."""
+    pass
+
+
+@new.command("scenario")
+@click.option(
+    "--spec",
+    "-s",
+    help="Path to OpenAPI spec file",
+    type=click.Path(exists=True),
+)
+@click.option(
+    "--output",
+    "-o",
+    default="pt_scenario.yaml",
+    help="Output file name (default: pt_scenario.yaml)",
+)
+def new_scenario(spec: Optional[str], output: str):
+    """Interactive wizard to create pt_scenario.yaml.
+
+    Guides you through step-by-step scenario building with:
+    - Endpoint selection from OpenAPI spec
+    - Smart capture suggestions (id, token fields)
+    - Loop and think time support
+    - Live preview after each step
+
+    Example:
+        jmeter-gen new scenario
+        jmeter-gen new scenario --spec api/openapi.yaml
+        jmeter-gen new scenario --output my_scenario.yaml
+    """
+    try:
+        import questionary
+
+        # Find or load spec
+        if spec:
+            spec_path = spec
+        else:
+            analyzer = ProjectAnalyzer()
+            specs = analyzer.find_all_openapi_specs(".")
+
+            if not specs:
+                console.print(
+                    "[red]No OpenAPI spec found in current directory.[/red]"
+                )
+                console.print("Use --spec to specify path.")
+                raise SystemExit(1)
+
+            if len(specs) == 1:
+                # Single spec - use it directly
+                spec_path = specs[0]["spec_path"]
+                console.print(f"[green]Using spec: {spec_path}[/green]")
+            else:
+                # Multiple specs - ask user to choose
+                choices = [s["spec_path"] for s in specs]
+                spec_path = questionary.select(
+                    "Multiple specs found. Select one:",
+                    choices=choices,
+                ).ask()
+
+                if not spec_path:
+                    console.print("[yellow]Cancelled.[/yellow]")
+                    raise SystemExit(0)
+
+        # Parse spec
+        parser = OpenAPIParser()
+        spec_data = parser.parse(spec_path)
+
+        console.print(f"\n[green]Found {len(spec_data['endpoints'])} endpoints in spec[/green]\n")
+
+        # Run wizard
+        wizard = ScenarioWizard(parser, spec_data)
+        scenario_dict = wizard.run()
+
+        # Save
+        wizard.save(scenario_dict, output)
+
+        # Summary
+        console.print(f"\n[green]Saved: {output}[/green]")
+        console.print(f"  {len(scenario_dict['scenario'])} steps created")
+
+        # Count captures and loops
+        captures = sum(
+            len(s.get("capture", []))
+            for s in scenario_dict["scenario"]
+        )
+        loops = sum(
+            1 for s in scenario_dict["scenario"]
+            if "loop" in s
+        )
+        think_times = sum(
+            1 for s in scenario_dict["scenario"]
+            if "think_time" in s
+        )
+
+        console.print(f"  {captures} capture(s) configured")
+        if loops:
+            console.print(f"  {loops} loop(s) configured")
+        if think_times:
+            console.print(f"  {think_times} think time(s) configured")
+
+        console.print(
+            f"\n[dim]Next step: jmeter-gen generate[/dim]"
+        )
+
+    except KeyboardInterrupt:
+        console.print("\n[yellow]Wizard cancelled.[/yellow]")
+        raise SystemExit(0)
+    except JMeterGenException as e:
+        console.print(f"\n[bold red]Error:[/bold red] {e}")
+        raise SystemExit(1)
+    except Exception as e:
+        console.print(f"\n[bold red]Unexpected error:[/bold red] {e}")
+        raise SystemExit(1)
 
 
 def main():

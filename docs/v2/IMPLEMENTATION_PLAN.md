@@ -250,7 +250,6 @@ Release process:
 ## Example Scenario for Testing
 
 ```yaml
-version: "1.0"
 name: "Test Scenario"
 
 settings:

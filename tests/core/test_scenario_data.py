@@ -44,12 +44,13 @@ class TestScenarioSettings:
     def test_to_dict(self):
         """Test conversion to dictionary."""
         settings = ScenarioSettings(
-            threads=5, rampup=10, duration=120, base_url="http://example.com"
+            threads=5, rampup=10, loops=3, duration=120, base_url="http://example.com"
         )
         result = settings.to_dict()
         assert result == {
             "threads": 5,
             "rampup": 10,
+            "loops": 3,
             "duration": 120,
             "base_url": "http://example.com",
         }
@@ -58,6 +59,7 @@ class TestScenarioSettings:
         """Test to_dict with None values."""
         settings = ScenarioSettings()
         result = settings.to_dict()
+        assert result["loops"] is None
         assert result["duration"] is None
         assert result["base_url"] is None
 
@@ -220,7 +222,6 @@ class TestParsedScenario:
         ]
 
         scenario = ParsedScenario(
-            version="1.0",
             name="Test Scenario",
             description="A test scenario",
             settings=settings,
@@ -228,7 +229,6 @@ class TestParsedScenario:
             steps=steps,
         )
 
-        assert scenario.version == "1.0"
         assert scenario.name == "Test Scenario"
         assert scenario.description == "A test scenario"
         assert scenario.settings.threads == 5
@@ -238,7 +238,6 @@ class TestParsedScenario:
     def test_to_dict(self):
         """Test conversion to dictionary."""
         scenario = ParsedScenario(
-            version="1.0",
             name="Test",
             description=None,
             settings=ScenarioSettings(),
@@ -246,7 +245,6 @@ class TestParsedScenario:
             steps=[],
         )
         result = scenario.to_dict()
-        assert result["version"] == "1.0"
         assert result["name"] == "Test"
         assert "settings" in result
         assert "steps" in result

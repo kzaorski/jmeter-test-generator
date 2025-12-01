@@ -84,7 +84,6 @@ class PtScenarioParser:
         self._validate_required_fields(data, scenario_path)
 
         # Parse scenario data
-        version = str(data["version"])
         name = str(data["name"])
         description = data.get("description")
 
@@ -102,7 +101,6 @@ class PtScenarioParser:
         steps = self._parse_steps(data["scenario"], scenario_path)
 
         return ParsedScenario(
-            version=version,
             name=name,
             description=description,
             settings=settings,
@@ -172,9 +170,6 @@ class PtScenarioParser:
 
     def _validate_required_fields(self, data: dict, path: str) -> None:
         """Validate required fields in scenario data."""
-        if "version" not in data:
-            raise ScenarioParseException(f"Missing required field 'version' in {path}")
-
         if "name" not in data:
             raise ScenarioParseException(f"Missing required field 'name' in {path}")
 
@@ -196,6 +191,7 @@ class PtScenarioParser:
         return ScenarioSettings(
             threads=int(settings_data.get("threads", 1)),
             rampup=int(settings_data.get("rampup", 0)),
+            loops=settings_data.get("loops"),
             duration=settings_data.get("duration"),
             base_url=settings_data.get("base_url"),
         )
@@ -210,11 +206,61 @@ class PtScenarioParser:
                     f"Invalid step {i} in {scenario_path}: expected dictionary"
                 )
 
-            # Validate required step fields
+            # Check if this is a think_time step (no name required for backward compat)
+            if "think_time" in step_data and "endpoint" not in step_data and "steps" not in step_data:
+                think_time_ms = step_data["think_time"]
+                if not isinstance(think_time_ms, int) or think_time_ms < 0:
+                    raise ScenarioValidationException(
+                        f"Invalid think_time in step {i}: must be non-negative integer"
+                    )
+                step = ScenarioStep(
+                    name=step_data.get("name", "Think Time"),
+                    endpoint="think_time",
+                    endpoint_type="think_time",
+                    think_time=think_time_ms,
+                )
+                steps.append(step)
+                continue
+
+            # Check if this is a multi-step loop block (has loop + steps, no endpoint)
+            if "loop" in step_data and "steps" in step_data and "endpoint" not in step_data:
+                loop_config = self._parse_loop(step_data.get("loop"), i, scenario_path)
+                if loop_config is None:
+                    raise ScenarioValidationException(
+                        f"Invalid loop configuration in step {i} of {scenario_path}"
+                    )
+
+                # Parse nested steps recursively
+                nested_steps_data = step_data["steps"]
+                if not isinstance(nested_steps_data, list) or not nested_steps_data:
+                    raise ScenarioValidationException(
+                        f"Multi-step loop in step {i} must have non-empty 'steps' list"
+                    )
+                nested_steps = self._parse_steps(nested_steps_data, scenario_path)
+
+                # Create loop block name
+                if loop_config.count:
+                    loop_name = step_data.get("name", f"Loop {loop_config.count}x")
+                else:
+                    loop_name = step_data.get("name", "While Loop")
+
+                step = ScenarioStep(
+                    name=loop_name,
+                    endpoint="loop_block",
+                    endpoint_type="loop_block",
+                    loop=loop_config,
+                    nested_steps=nested_steps,
+                )
+                steps.append(step)
+                continue
+
+            # Validate required step fields for regular steps
             if "name" not in step_data:
                 raise ScenarioValidationException(
                     f"Missing 'name' in step {i} of {scenario_path}"
                 )
+
+            # Regular endpoint step - validate endpoint field
             if "endpoint" not in step_data:
                 raise ScenarioValidationException(
                     f"Missing 'endpoint' in step {i} of {scenario_path}"
@@ -230,7 +276,7 @@ class PtScenarioParser:
             # Parse assertions
             assertions = self._parse_assert(step_data.get("assert"))
 
-            # Parse loop configuration
+            # Parse loop configuration (single-step loop)
             loop_config = self._parse_loop(step_data.get("loop"), i, scenario_path)
 
             step = ScenarioStep(
@@ -412,13 +458,16 @@ class PtScenarioParser:
                     "must be a positive integer"
                 )
 
-        # Validate while condition
+        # Validate while condition - use placeholder if empty
         if while_condition is not None:
-            if not isinstance(while_condition, str) or not while_condition.strip():
+            if not isinstance(while_condition, str):
                 raise ScenarioValidationException(
                     f"Invalid 'loop.while' in step {step_num} of {scenario_path}: "
-                    "must be a non-empty string"
+                    "must be a string"
                 )
+            if not while_condition.strip():
+                # Use placeholder for empty while condition
+                while_condition = "$.status != 'done'"
 
         # Validate max_iterations
         if not isinstance(max_iterations, int) or max_iterations < 1:

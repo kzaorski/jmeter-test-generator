@@ -22,7 +22,6 @@ Version 2 introduces **scenario-based test generation** - define realistic user 
 Create `pt_scenario.yaml` in your project (same directory as your OpenAPI spec):
 
 ```yaml
-version: "1.0"
 name: "User Flow"
 
 scenario:

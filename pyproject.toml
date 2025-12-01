@@ -4,11 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "jmeter-test-generator"
-version = "2.1.1"
+version = "3.0.0"
 description = "Generate JMeter JMX test plans from OpenAPI specifications"
 readme = "README.md"
 authors = [
-    {name = "Your Name", email = "you@example.com"}
+    {name = "Krzysztof Zaorski", email = "zaorski+git@gmail.com"}
 ]
 license = {text = "MIT"}
 requires-python = ">=3.9"
@@ -17,10 +17,6 @@ classifiers = [
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
     "Topic :: Software Development :: Testing",
     "Topic :: Software Development :: Quality Assurance",
 ]
@@ -31,6 +27,7 @@ dependencies = [
     "rich>=13.0.0",
     "pyyaml>=6.0",
     "mcp>=1.0.0",
+    "questionary>=2.0.0",
     # MCP SDK requires specific versions of these dependencies
     "pydantic>=2.7.0",
     "anyio>=4.5",
@@ -53,10 +50,10 @@ dev = [
 jmeter-gen = "jmeter_gen.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/your-org/jmeter-test-generator"
-Documentation = "https://github.com/your-org/jmeter-test-generator/docs"
-Repository = "https://github.com/your-org/jmeter-test-generator"
-Issues = "https://github.com/your-org/jmeter-test-generator/issues"
+Homepage = "https://github.com/kzaorski/jmeter-test-generator"
+Documentation = "https://github.com/kzaorski/jmeter-test-generator/docs"
+Repository = "https://github.com/kzaorski/jmeter-test-generator"
+Issues = "https://github.com/kzaorski/jmeter-test-generator/issues"
 
 [tool.setuptools]
 packages = ["jmeter_gen", "jmeter_gen.core"]
@@ -75,6 +72,7 @@ markers = [
     "integration: marks integration tests (deselect with '-m \"not integration\"')",
     "unit: marks unit tests",
     "v2: marks v2 scenario-based tests",
+    "v3: marks v3 wizard tests",
 ]
 
 [tool.coverage.run]

@@ -133,7 +133,6 @@ output.jmx (with correlations)
 ## 4. Example pt_scenario.yaml
 
 ```yaml
-version: "1.0"
 name: "User CRUD Flow"
 spec: "./openapi.yaml"
 

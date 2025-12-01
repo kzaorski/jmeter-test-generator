@@ -1,4 +1,3 @@
-version: "1.0"
 name: "Broken YAML Syntax"
 description: "This file has invalid YAML syntax
 

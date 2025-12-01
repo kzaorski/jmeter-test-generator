@@ -1,0 +1,35 @@
+name: "Multi-Step While Loop Test"
+description: "Test scenario with multi-step while loop"
+
+settings:
+  threads: 1
+  rampup: 0
+
+scenario:
+  - name: "Start Job"
+    endpoint: "POST /jobs"
+    capture:
+      - jobId
+    assert:
+      status: 201
+
+  - loop:
+      while: "$.status != 'completed'"
+      max: 50
+      interval: 2000
+    steps:
+      - name: "Check Job Status"
+        endpoint: "GET /jobs/${jobId}/status"
+        capture:
+          - status
+        assert:
+          status: 200
+      - name: "Log Progress"
+        endpoint: "POST /jobs/${jobId}/log"
+        payload:
+          message: "Checking status..."
+
+  - name: "Get Result"
+    endpoint: "GET /jobs/${jobId}/result"
+    assert:
+      status: 200
