@@ -161,12 +161,15 @@ Output (formatted response)
   - CLI commands: analyze, generate, validate, mcp (94% coverage)
   - Rich formatting, error handling, interactive prompts
 - **Phase 3: MCP Server** ✅ COMPLETED
-  - MCP Server with 5 tools (73% coverage)
+  - MCP Server with 8 tools (78% coverage)
   - `analyze_project_for_jmeter`: project_path, detect_changes, jmx_path, **scenario detection**
   - `generate_jmx_from_openapi`: spec_path, output_path, threads, rampup, duration, base_url, detect_changes, auto_update, export_diff_path
   - `generate_scenario_jmx`: scenario_path, spec_path, output_path, base_url_override, **auto-filename**
   - `validate_jmx`: jmx_path - validates JMX structure with recommendations
   - `visualize_scenario`: scenario_path, spec_path - returns JSON, text, and Mermaid diagram
+  - `list_endpoints`: spec_path - list all endpoints from OpenAPI spec
+  - `suggest_captures`: spec_path, endpoint - suggest capturable variables from response
+  - `build_scenario`: spec_path, steps, name, settings - build pt_scenario.yaml from steps
   - Full async/await implementation
   - Integrated validation workflow
 - **Change Detection Modules** ✅ COMPLETED
@@ -184,7 +187,7 @@ Output (formatted response)
   - `jmeter-gen new scenario` command
   - Auto-detect OpenAPI spec, smart capture suggestions
   - Loop and think time support
-- **Overall**: 624 tests passing, 85% code coverage
+- **Overall**: 677 tests passing, 82% code coverage
 - Project structure and configuration (pyproject.toml)
 - Package initialization files
 - Comprehensive documentation (8 docs)

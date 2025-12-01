@@ -105,9 +105,25 @@ Configure in VS Code settings.json:
 }
 ```
 
-Then use in Copilot:
+The MCP Server provides 8 tools for Copilot integration:
+
+| Tool | Description |
+|------|-------------|
+| `analyze_project_for_jmeter` | Discover OpenAPI specs and scenario files |
+| `generate_jmx_from_openapi` | Generate JMX from OpenAPI spec |
+| `generate_scenario_jmx` | Generate JMX from pt_scenario.yaml |
+| `validate_jmx` | Validate JMX file structure |
+| `visualize_scenario` | Visualize scenario with Mermaid diagram |
+| `list_endpoints` | List all endpoints from OpenAPI spec |
+| `suggest_captures` | Suggest capturable variables for endpoint |
+| `build_scenario` | Build pt_scenario.yaml from step definitions |
+
+Example prompts in Copilot:
 ```
-"Prepare JMeter test for this project"
+"Analyze this project for JMeter testing"
+"List all endpoints from the OpenAPI spec"
+"Suggest captures for the createUser endpoint"
+"Build a scenario with login, create item, and logout steps"
 ```
 
 ## Architecture

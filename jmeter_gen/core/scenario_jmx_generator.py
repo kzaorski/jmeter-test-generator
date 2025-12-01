@@ -275,12 +275,24 @@ class ScenarioJMXGenerator:
                     extractors_created += 1
 
                 # For while loops, add extractor for the condition variable
+                # ONLY if not already captured (from explicit captures OR auto-capture)
                 if step.loop and step.loop.while_condition:
-                    condition_extractor = self._create_condition_extractor(step.loop.while_condition)
-                    if condition_extractor is not None:
-                        sampler_hashtree.append(condition_extractor)
-                        ET.SubElement(sampler_hashtree, "hashTree")
-                        extractors_created += 1
+                    # Extract variable name from condition
+                    match = JSONPATH_FIELD_PATTERN.search(step.loop.while_condition)
+                    if match:
+                        condition_var = match.group(1)
+                        # Check if already captured
+                        already_captured = any(
+                            m.variable_name == condition_var for m in step_mappings
+                        )
+                        if not already_captured:
+                            condition_extractor = self._create_condition_extractor(
+                                step.loop.while_condition
+                            )
+                            if condition_extractor is not None:
+                                sampler_hashtree.append(condition_extractor)
+                                ET.SubElement(sampler_hashtree, "hashTree")
+                                extractors_created += 1
 
                 # Add assertions
                 if step.assertions:

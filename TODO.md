@@ -93,11 +93,17 @@
 - [x] Implement `list_tools()` handler
 - [x] Implement `analyze_project_for_jmeter` tool
 - [x] Implement `generate_jmx_from_openapi` tool
+- [x] Implement `generate_scenario_jmx` tool
+- [x] Implement `validate_jmx` tool
+- [x] Implement `visualize_scenario` tool
+- [x] Implement `list_endpoints` tool (v3)
+- [x] Implement `suggest_captures` tool (v3)
+- [x] Implement `build_scenario` tool (v3)
 - [x] Implement `call_tool()` handler
 - [x] Add error handling for MCP
 - [x] Test MCP Server startup
 - [x] Create `tests/test_mcp_server.py`
-- [x] Write MCP Server tests - **26 test cases, 91% coverage**
+- [x] Write MCP Server tests - **8 tools, 677 total tests**
 
 ### Step 6 (continued): MCP Integration
 - [ ] Test with MCP client - **Deferred to user**
@@ -268,9 +274,9 @@
 
 ## Testing Checklist
 
-- [x] All unit tests pass - **393/393 passing**
-- [x] All integration tests pass - **33/33 passing**
-- [x] >80% code coverage - **91% achieved (target: 95%)**
+- [x] All unit tests pass - **677/677 passing**
+- [x] All integration tests pass - **Included in total**
+- [x] >80% code coverage - **82% achieved**
 - [x] CLI works with real projects - **Petstore API verified**
 - [ ] MCP Server works with Copilot - **Deferred to user**
 - [x] Generated JMX loads in JMeter GUI - **Verified**
@@ -306,9 +312,9 @@
 
 **Phase**: Phase 1 ✅ COMPLETED, Phase 2 ✅ COMPLETED, Phase 3 ✅ COMPLETED, Phase 4 - Testing & Documentation ✅ COMPLETED
 **Completed**: Step 1 - ProjectAnalyzer ✅, Step 2 - OpenAPIParser ✅, Step 3 - JMXGenerator ✅, Step 4 - JMXValidator ✅, Step 5 - CLI ✅, Step 6 - MCP Server ✅, Step 7 - Comprehensive Testing ✅, Step 8 - Documentation & Examples ✅
-**Status**: MVP COMPLETE - Ready for v1.0.0 release
+**Status**: v3.0.0 COMPLETE - Scenario Init Wizard + MCP Scenario Builder
 
-**Latest Achievement**: Step 8 completed (2025-11-24). All documentation updated, 2 comprehensive examples created (Petstore + Simple CRUD), CHANGELOG.md created with v1.0.0 release notes. Project is production-ready with 91% test coverage (393 tests) and complete documentation suite. v1.1.0 released with multi-spec support and change detection.
+**Latest Achievement**: v3.0.0 released (2025-12-01). Added Scenario Init Wizard (`jmeter-gen new scenario`) and 3 new MCP tools for scenario building via natural language: `list_endpoints`, `suggest_captures`, `build_scenario`. MCP Server now provides 8 tools. 677 tests passing with 82% coverage.
 
 ### Step 1 Summary (Completed)
 - **Files Created**:

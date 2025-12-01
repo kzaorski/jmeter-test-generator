@@ -8,6 +8,7 @@ Supports change detection with detect_changes, auto_update options.
 
 import asyncio
 import json
+import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -32,6 +33,10 @@ from jmeter_gen.core.scenario_mermaid import (
     generate_mermaid_diagram,
     generate_text_visualization,
 )
+
+# v3 imports
+import yaml
+from jmeter_gen.core.scenario_wizard import ScenarioWizard
 
 
 # Initialize MCP Server
@@ -217,6 +222,120 @@ async def list_tools() -> List[Tool]:
                 "required": ["scenario_path"],
             },
         ),
+        # v3 scenario builder tools
+        Tool(
+            name="list_endpoints",
+            description=(
+                "List all endpoints from an OpenAPI specification. "
+                "Returns endpoint details including method, path, operationId, summary, "
+                "and whether the endpoint has a request body. Use this to show available "
+                "endpoints before building a test scenario."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "spec_path": {
+                        "type": "string",
+                        "description": "Path to OpenAPI specification file (YAML or JSON)",
+                    },
+                },
+                "required": ["spec_path"],
+            },
+        ),
+        Tool(
+            name="suggest_captures",
+            description=(
+                "Analyze an endpoint's response schema and suggest fields that can be "
+                "captured as variables (e.g., IDs, tokens). Returns suggested variable "
+                "names with their JSONPath expressions and confidence levels."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "spec_path": {
+                        "type": "string",
+                        "description": "Path to OpenAPI specification file (YAML or JSON)",
+                    },
+                    "endpoint": {
+                        "type": "string",
+                        "description": "Endpoint identifier: operationId (e.g., 'createUser') or METHOD /path (e.g., 'POST /users')",
+                    },
+                },
+                "required": ["spec_path", "endpoint"],
+            },
+        ),
+        Tool(
+            name="build_scenario",
+            description=(
+                "Build a pt_scenario.yaml file from a list of steps. Each step defines "
+                "an endpoint to call, optional variable captures, and optional loop/think_time. "
+                "Validates that all endpoints exist in the spec. Returns the generated YAML "
+                "content and saves it to the specified output path."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "spec_path": {
+                        "type": "string",
+                        "description": "Path to OpenAPI specification file (YAML or JSON)",
+                    },
+                    "steps": {
+                        "type": "array",
+                        "description": "List of scenario steps",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "endpoint": {
+                                    "type": "string",
+                                    "description": "Endpoint: operationId or 'METHOD /path'",
+                                },
+                                "name": {
+                                    "type": "string",
+                                    "description": "Step name (optional, auto-generated if not provided)",
+                                },
+                                "capture": {
+                                    "type": "array",
+                                    "items": {"type": "string"},
+                                    "description": "Variables to capture from response (e.g., ['userId', 'token'])",
+                                },
+                                "think_time": {
+                                    "type": "integer",
+                                    "description": "Think time in milliseconds after this step",
+                                },
+                                "loop": {
+                                    "type": "object",
+                                    "description": "Loop configuration: {count: N} or {while: '$.condition'}",
+                                },
+                            },
+                            "required": ["endpoint"],
+                        },
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Scenario name (default: 'Test Scenario')",
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "Scenario description (optional)",
+                    },
+                    "output_path": {
+                        "type": "string",
+                        "description": "Output file path (default: 'pt_scenario.yaml')",
+                    },
+                    "settings": {
+                        "type": "object",
+                        "description": "Test settings: threads, rampup, duration, base_url",
+                        "properties": {
+                            "threads": {"type": "integer"},
+                            "rampup": {"type": "integer"},
+                            "duration": {"type": "integer"},
+                            "base_url": {"type": "string"},
+                        },
+                    },
+                },
+                "required": ["spec_path", "steps"],
+            },
+        ),
     ]
 
 
@@ -244,6 +363,12 @@ async def call_tool(name: str, arguments: Any) -> List[TextContent]:
         return await _validate_jmx(arguments)
     elif name == "visualize_scenario":
         return await _visualize_scenario(arguments)
+    elif name == "list_endpoints":
+        return await _list_endpoints(arguments)
+    elif name == "suggest_captures":
+        return await _suggest_captures(arguments)
+    elif name == "build_scenario":
+        return await _build_scenario(arguments)
     else:
         raise ValueError(f"Unknown tool: {name}")
 
@@ -882,6 +1007,327 @@ async def _visualize_scenario(arguments: Dict[str, Any]) -> List[TextContent]:
             "mermaid_diagram": mermaid_diagram,
             "warnings": correlation_result.warnings if correlation_result else [],
             "errors": correlation_result.errors if correlation_result else [],
+        }
+
+        return [TextContent(type="text", text=json.dumps(response, indent=2))]
+
+    except JMeterGenException as e:
+        return [
+            TextContent(
+                type="text",
+                text=json.dumps(
+                    {"success": False, "error": str(e), "error_type": type(e).__name__},
+                    indent=2,
+                ),
+            )
+        ]
+    except Exception as e:
+        return [
+            TextContent(
+                type="text",
+                text=json.dumps(
+                    {"success": False, "error": str(e), "error_type": type(e).__name__},
+                    indent=2,
+                ),
+            )
+        ]
+
+
+async def _list_endpoints(arguments: Dict[str, Any]) -> List[TextContent]:
+    """List all endpoints from OpenAPI specification.
+
+    Args:
+        arguments: Dictionary with 'spec_path' key
+
+    Returns:
+        List with single TextContent containing endpoint list
+    """
+    try:
+        spec_path = arguments.get("spec_path")
+        if not spec_path:
+            raise ValueError("spec_path is required")
+
+        # Verify spec file exists
+        if not Path(spec_path).exists():
+            raise FileNotFoundError(f"OpenAPI spec file not found: {spec_path}")
+
+        # Parse OpenAPI spec
+        parser = OpenAPIParser()
+        spec_data = parser.parse(spec_path)
+
+        # Use ScenarioWizard to get readable endpoint names
+        wizard = ScenarioWizard(parser, spec_data)
+
+        # Format endpoints with readable names
+        endpoints = []
+        for ep in spec_data.get("endpoints", []):
+            method = ep.get("method", "GET").upper()
+            path = ep.get("path", "/")
+            operation_id = ep.get("operationId", "")
+
+            # Get readable display name (fix ugly auto-generated operationIds)
+            display_name = wizard._get_readable_display_name(operation_id, path, method)
+
+            endpoints.append({
+                "method": method,
+                "path": path,
+                "operationId": operation_id,
+                "displayName": display_name,
+                "summary": ep.get("summary", ""),
+                "hasRequestBody": ep.get("requestBody", False),
+                "parameters": ep.get("parameters", []),
+            })
+
+        response = {
+            "success": True,
+            "spec_path": spec_path,
+            "api_title": spec_data.get("title", "Unknown API"),
+            "api_version": spec_data.get("version", "Unknown"),
+            "base_url": spec_data.get("base_url", ""),
+            "endpoints_count": len(endpoints),
+            "endpoints": endpoints,
+        }
+
+        return [TextContent(type="text", text=json.dumps(response, indent=2))]
+
+    except JMeterGenException as e:
+        return [
+            TextContent(
+                type="text",
+                text=json.dumps(
+                    {"success": False, "error": str(e), "error_type": type(e).__name__},
+                    indent=2,
+                ),
+            )
+        ]
+    except Exception as e:
+        return [
+            TextContent(
+                type="text",
+                text=json.dumps(
+                    {"success": False, "error": str(e), "error_type": type(e).__name__},
+                    indent=2,
+                ),
+            )
+        ]
+
+
+async def _suggest_captures(arguments: Dict[str, Any]) -> List[TextContent]:
+    """Suggest capturable fields for an endpoint.
+
+    Args:
+        arguments: Dictionary with 'spec_path' and 'endpoint' keys
+
+    Returns:
+        List with single TextContent containing capture suggestions
+    """
+    try:
+        spec_path = arguments.get("spec_path")
+        endpoint = arguments.get("endpoint")
+
+        if not spec_path:
+            raise ValueError("spec_path is required")
+        if not endpoint:
+            raise ValueError("endpoint is required")
+
+        # Verify spec file exists
+        if not Path(spec_path).exists():
+            raise FileNotFoundError(f"OpenAPI spec file not found: {spec_path}")
+
+        # Parse OpenAPI spec
+        parser = OpenAPIParser()
+        spec_data = parser.parse(spec_path)
+
+        # Create wizard to use its methods
+        wizard = ScenarioWizard(parser, spec_data)
+        wizard._endpoints = spec_data.get("endpoints", [])  # Initialize endpoints
+
+        # Parse endpoint identifier (operationId or "METHOD /path")
+        method = None
+        path = None
+
+        if " " in endpoint and endpoint.split()[0].upper() in ("GET", "POST", "PUT", "DELETE", "PATCH"):
+            # "METHOD /path" format
+            parts = endpoint.split(" ", 1)
+            method = parts[0].upper()
+            path = parts[1]
+        else:
+            # operationId format - find matching endpoint
+            for ep in spec_data.get("endpoints", []):
+                if ep.get("operationId") == endpoint:
+                    method = ep.get("method", "GET").upper()
+                    path = ep.get("path", "/")
+                    break
+
+        if not method or not path:
+            raise ValueError(f"Endpoint not found: {endpoint}")
+
+        # Get endpoint data
+        endpoint_data = wizard._get_endpoint_data(method, path)
+        if not endpoint_data:
+            raise ValueError(f"Endpoint not found: {method} {path}")
+
+        # Get capture suggestions using wizard's method
+        suggestions = wizard._suggest_captures(endpoint_data)
+
+        response = {
+            "success": True,
+            "endpoint": f"{method} {path}",
+            "operationId": endpoint_data.get("operationId", ""),
+            "suggestions": suggestions,
+            "note": "Use 'capture' field in build_scenario steps to capture these variables",
+        }
+
+        return [TextContent(type="text", text=json.dumps(response, indent=2))]
+
+    except JMeterGenException as e:
+        return [
+            TextContent(
+                type="text",
+                text=json.dumps(
+                    {"success": False, "error": str(e), "error_type": type(e).__name__},
+                    indent=2,
+                ),
+            )
+        ]
+    except Exception as e:
+        return [
+            TextContent(
+                type="text",
+                text=json.dumps(
+                    {"success": False, "error": str(e), "error_type": type(e).__name__},
+                    indent=2,
+                ),
+            )
+        ]
+
+
+async def _build_scenario(arguments: Dict[str, Any]) -> List[TextContent]:
+    """Build pt_scenario.yaml from step definitions.
+
+    Args:
+        arguments: Dictionary with scenario configuration
+
+    Returns:
+        List with single TextContent containing build result
+    """
+    try:
+        spec_path = arguments.get("spec_path")
+        steps = arguments.get("steps", [])
+        name = arguments.get("name", "Test Scenario")
+        description = arguments.get("description", "")
+        output_path = arguments.get("output_path", "pt_scenario.yaml")
+        settings = arguments.get("settings", {})
+
+        if not spec_path:
+            raise ValueError("spec_path is required")
+        if not steps:
+            raise ValueError("steps is required and must not be empty")
+
+        # Verify spec file exists
+        if not Path(spec_path).exists():
+            raise FileNotFoundError(f"OpenAPI spec file not found: {spec_path}")
+
+        # Parse OpenAPI spec
+        parser = OpenAPIParser()
+        spec_data = parser.parse(spec_path)
+
+        # Create wizard to use its methods
+        wizard = ScenarioWizard(parser, spec_data)
+        wizard._endpoints = spec_data.get("endpoints", [])  # Initialize endpoints
+
+        # Validate and normalize steps
+        normalized_steps = []
+        warnings = []
+
+        for idx, step in enumerate(steps):
+            endpoint = step.get("endpoint")
+            if not endpoint:
+                raise ValueError(f"Step {idx + 1}: endpoint is required")
+
+            # Parse endpoint identifier
+            method = None
+            path = None
+
+            if " " in endpoint and endpoint.split()[0].upper() in ("GET", "POST", "PUT", "DELETE", "PATCH"):
+                parts = endpoint.split(" ", 1)
+                method = parts[0].upper()
+                path = parts[1]
+            else:
+                # operationId format
+                for ep in spec_data.get("endpoints", []):
+                    if ep.get("operationId") == endpoint:
+                        method = ep.get("method", "GET").upper()
+                        path = ep.get("path", "/")
+                        break
+
+            if not method or not path:
+                warnings.append(f"Step {idx + 1}: Endpoint '{endpoint}' not found in spec")
+                # Still include it, user might know what they're doing
+                normalized_step = {"endpoint": endpoint}
+            else:
+                endpoint_data = wizard._get_endpoint_data(method, path)
+                display_name = wizard._get_readable_display_name(
+                    endpoint_data.get("operationId", ""),
+                    path,
+                    method
+                )
+                normalized_step = {"endpoint": f"{method} {path}"}
+
+                # Generate step name if not provided
+                if not step.get("name"):
+                    # Convert camelCase/PascalCase to Title Case
+                    step_name = re.sub(r'([a-z])([A-Z])', r'\1 \2', display_name)
+                    step_name = step_name.replace("_", " ").title()
+                    normalized_step["name"] = step_name
+                else:
+                    normalized_step["name"] = step["name"]
+
+            # Copy other fields
+            if step.get("capture"):
+                normalized_step["capture"] = step["capture"]
+            if step.get("think_time"):
+                normalized_step["think_time"] = step["think_time"]
+            if step.get("loop"):
+                normalized_step["loop"] = step["loop"]
+            if step.get("assert"):
+                normalized_step["assert"] = step["assert"]
+
+            normalized_steps.append(normalized_step)
+
+        # Build scenario dict (same structure as ScenarioWizard)
+        scenario: Dict[str, Any] = {
+            "version": "1.0",
+            "name": name,
+        }
+
+        if description:
+            scenario["description"] = description
+
+        if settings:
+            scenario["settings"] = settings
+
+        scenario["scenario"] = normalized_steps
+
+        # Convert to YAML
+        yaml_content = yaml.dump(
+            scenario,
+            default_flow_style=False,
+            sort_keys=False,
+            allow_unicode=True,
+        )
+
+        # Save to file
+        Path(output_path).write_text(yaml_content, encoding="utf-8")
+
+        response = {
+            "success": True,
+            "output_path": output_path,
+            "scenario_name": name,
+            "steps_count": len(normalized_steps),
+            "yaml_content": yaml_content,
+            "warnings": warnings,
+            "next_step": f"Use generate_scenario_jmx with scenario_path: {output_path} and spec_path: {spec_path}",
         }
 
         return [TextContent(type="text", text=json.dumps(response, indent=2))]

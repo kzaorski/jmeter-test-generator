@@ -1021,9 +1021,14 @@ class ScenarioWizard:
                 loop = step["loop"]
                 if "count" in loop:
                     loop_label = f"(loop {loop['count']}x)"
+                    auto_captures = ""
                 else:
-                    loop_label = f"(while: {loop.get('while', '')})"
-                table.add_row(str(i), loop_label, "", "")
+                    loop_label = "(while)"
+                    while_condition = loop.get("while", "")
+                    # Extract auto-capture from while condition
+                    match = re.search(r"\$\.([a-zA-Z_][a-zA-Z0-9_]*)", while_condition)
+                    auto_captures = f"{match.group(1)} (auto)" if match else ""
+                table.add_row(str(i), loop_label, loop.get("while", ""), auto_captures)
 
                 # Add nested steps with indentation
                 for nested_step in step["steps"]:
@@ -1041,10 +1046,12 @@ class ScenarioWizard:
                 if "count" in loop:
                     loop_label = f"(loop {loop['count']}x)"
                     loop_info = ""
+                    auto_captures = ""
                 else:
                     loop_label = "(while)"
                     loop_info = loop.get("while", "")
-                table.add_row(str(i), loop_label, loop_info, "")
+                    auto_captures = self._format_captures(step, include_auto_capture=True)
+                table.add_row(str(i), loop_label, loop_info, auto_captures)
 
                 # Add indented endpoint row
                 endpoint = step.get("endpoint", "")
@@ -1056,19 +1063,35 @@ class ScenarioWizard:
 
         self.console.print(table)
 
-    def _format_captures(self, step: dict) -> str:
-        """Format captures list for display."""
-        captures = step.get("capture", [])
-        if not captures:
-            return "-"
+    def _format_captures(self, step: dict, include_auto_capture: bool = False) -> str:
+        """Format captures list for display.
 
+        Args:
+            step: Step dictionary
+            include_auto_capture: If True, also extract auto-capture from while condition
+        """
+        captures = step.get("capture", [])
         cap_names = []
+
         for c in captures:
             if isinstance(c, str):
                 cap_names.append(c)
             elif isinstance(c, dict):
                 cap_names.extend(c.keys())
-        return ", ".join(cap_names)
+
+        # Extract auto-capture from while condition
+        if include_auto_capture:
+            loop = step.get("loop", {})
+            while_condition = loop.get("while", "")
+            if while_condition:
+                # Extract field from $.field pattern
+                match = re.search(r"\$\.([a-zA-Z_][a-zA-Z0-9_]*)", while_condition)
+                if match:
+                    auto_var = match.group(1)
+                    if auto_var not in cap_names:
+                        cap_names.append(f"{auto_var} (auto)")
+
+        return ", ".join(cap_names) if cap_names else "-"
 
     def _build_scenario_dict(self) -> dict:
         """Build final scenario dictionary."""

@@ -5,6 +5,21 @@ All notable changes to the JMeter Test Generator project will be documented in t
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.0] - 2025-12-01
+
+### Added
+- **MCP Scenario Builder Tools** - 3 new tools for scenario creation via MCP
+  - `list_endpoints`: List all endpoints from OpenAPI spec with details
+  - `suggest_captures`: Suggest capturable variables from endpoint response schema
+  - `build_scenario`: Build pt_scenario.yaml from step definitions
+
+### Changed
+- MCP Server now provides 8 tools (was 5)
+- Test count increased to 677 tests
+- Code coverage at 82%
+
+---
+
 ## [3.0.0] - 2025-12-01
 
 ### Added

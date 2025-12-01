@@ -166,7 +166,7 @@ When no scenario file exists, v1 behavior is unchanged.
 
 ## MCP Server Tools
 
-The MCP Server provides 5 tools for integration with GitHub Copilot and other MCP clients:
+The MCP Server provides 8 tools for integration with GitHub Copilot and other MCP clients:
 
 | Tool | Description |
 |------|-------------|
@@ -175,6 +175,9 @@ The MCP Server provides 5 tools for integration with GitHub Copilot and other MC
 | `generate_scenario_jmx` | Generate JMX from pt_scenario.yaml with correlations |
 | `validate_jmx` | Validate JMX file structure with recommendations |
 | `visualize_scenario` | Visualize scenario with JSON, text, and Mermaid output |
+| `list_endpoints` | List all endpoints from OpenAPI spec with details |
+| `suggest_captures` | Suggest capturable variables from endpoint response schema |
+| `build_scenario` | Build pt_scenario.yaml from step definitions |
 
 ---
 

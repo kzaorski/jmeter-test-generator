@@ -19,6 +19,10 @@ from jmeter_gen.core.scenario_data import (
 # Variable reference pattern
 VARIABLE_PATTERN = re.compile(r"\$\{([a-zA-Z_][a-zA-Z0-9_]*)\}")
 
+# Pattern to extract JSONPath field from while condition
+# e.g., "$.status != 'finished'" -> "status"
+JSONPATH_FIELD_PATTERN = re.compile(r"\$\.([a-zA-Z_][a-zA-Z0-9_]*)")
+
 
 class CorrelationAnalyzer:
     """Analyze scenarios and generate correlation mappings.
@@ -61,30 +65,58 @@ class CorrelationAnalyzer:
         captured_vars: dict[str, int] = {}  # var_name -> step_index
 
         for step_index, step in enumerate(scenario.steps, start=1):
-            if not step.enabled or not step.captures:
+            if not step.enabled:
                 continue
 
-            step_mappings = self.analyze_step(step, step_index)
+            # Process explicit captures
+            if step.captures:
+                step_mappings = self.analyze_step(step, step_index)
 
-            for mapping in step_mappings:
-                if mapping.confidence < 0.8:
-                    warnings.append(
-                        f"Step [{step_index}]: Low confidence ({mapping.confidence:.0%}) "
-                        f"for '{mapping.variable_name}' -> {mapping.jsonpath}"
-                    )
+                for mapping in step_mappings:
+                    if mapping.confidence < 0.8:
+                        warnings.append(
+                            f"Step [{step_index}]: Low confidence ({mapping.confidence:.0%}) "
+                            f"for '{mapping.variable_name}' -> {mapping.jsonpath}"
+                        )
 
-                # Track for usage analysis
-                captured_vars[mapping.variable_name] = step_index
-                mappings.append(mapping)
+                    # Track for usage analysis
+                    captured_vars[mapping.variable_name] = step_index
+                    mappings.append(mapping)
 
-            # Check for unresolved captures
-            for capture in step.captures:
-                found = any(m.variable_name == capture.variable_name for m in step_mappings)
-                if not found and not capture.jsonpath:
-                    errors.append(
-                        f"Step [{step_index}]: Could not resolve JSONPath for "
-                        f"capture '{capture.variable_name}'"
-                    )
+                # Check for unresolved captures
+                for capture in step.captures:
+                    found = any(m.variable_name == capture.variable_name for m in step_mappings)
+                    if not found and not capture.jsonpath:
+                        errors.append(
+                            f"Step [{step_index}]: Could not resolve JSONPath for "
+                            f"capture '{capture.variable_name}'"
+                        )
+
+            # Process auto-capture from while condition
+            if step.loop and step.loop.while_condition:
+                auto_capture_mapping = self._create_auto_capture_mapping(
+                    step, step_index
+                )
+                if auto_capture_mapping:
+                    # Don't duplicate if already captured explicitly
+                    if auto_capture_mapping.variable_name not in captured_vars:
+                        captured_vars[auto_capture_mapping.variable_name] = step_index
+                        mappings.append(auto_capture_mapping)
+
+            # Process captures from nested steps in loop_block
+            if step.endpoint_type == "loop_block" and step.nested_steps:
+                for nested_step in step.nested_steps:
+                    if nested_step.enabled and nested_step.captures:
+                        nested_mappings = self.analyze_step(nested_step, step_index)
+                        for mapping in nested_mappings:
+                            if mapping.confidence < 0.8:
+                                warnings.append(
+                                    f"Step [{step_index}]: Low confidence ({mapping.confidence:.0%}) "
+                                    f"for '{mapping.variable_name}' -> {mapping.jsonpath}"
+                                )
+                            if mapping.variable_name not in captured_vars:
+                                captured_vars[mapping.variable_name] = step_index
+                                mappings.append(mapping)
 
         # Analyze variable usage across steps
         self._analyze_variable_usage(scenario, mappings, captured_vars)
@@ -93,6 +125,37 @@ class CorrelationAnalyzer:
             mappings=mappings,
             warnings=warnings,
             errors=errors,
+        )
+
+    def _create_auto_capture_mapping(
+        self, step: ScenarioStep, step_index: int
+    ) -> Optional[CorrelationMapping]:
+        """Create mapping for auto-captured variable from while condition.
+
+        Args:
+            step: Step with while loop condition
+            step_index: 1-based step index
+
+        Returns:
+            CorrelationMapping if variable found in condition, None otherwise
+        """
+        if not step.loop or not step.loop.while_condition:
+            return None
+
+        match = JSONPATH_FIELD_PATTERN.search(step.loop.while_condition)
+        if not match:
+            return None
+
+        var_name = match.group(1)
+        jsonpath = f"$.{var_name}"
+
+        return CorrelationMapping(
+            variable_name=var_name,
+            jsonpath=jsonpath,
+            source_step=step_index,
+            source_endpoint=step.endpoint,
+            confidence=1.0,  # Auto-capture is always exact
+            match_type="auto_capture",
         )
 
     def analyze_step(
@@ -356,6 +419,10 @@ class CorrelationAnalyzer:
         """Check if a step uses a specific variable."""
         pattern = f"${{{var_name}}}"
 
+        # Check endpoint (for METHOD /path/{var} format)
+        if step.endpoint and pattern in step.endpoint:
+            return True
+
         # Check path
         if step.path and pattern in step.path:
             return True
@@ -372,6 +439,83 @@ class CorrelationAnalyzer:
         if step.payload and self._dict_contains_pattern(step.payload, pattern):
             return True
 
+        # Check nested steps (for loop_block)
+        if step.nested_steps:
+            for nested in step.nested_steps:
+                if self._step_uses_variable(nested, var_name):
+                    return True
+
+        # Check if requestBody schema from OpenAPI has matching field
+        # This catches auto-generated payload from OpenAPI schema
+        request_schema = self._get_request_body_schema(step)
+        if request_schema and self._schema_has_matching_field(request_schema, var_name):
+            return True
+
+        return False
+
+    def _get_request_body_schema(self, step: ScenarioStep) -> Optional[dict[str, Any]]:
+        """Get requestBody schema from OpenAPI for this endpoint.
+
+        Args:
+            step: Scenario step
+
+        Returns:
+            Request body schema dict or None
+        """
+        if step.endpoint_type == "operation_id":
+            endpoint = self.openapi_parser.get_endpoint_by_operation_id(step.endpoint)
+        elif step.endpoint_type == "method_path" and step.method and step.path:
+            endpoint = self.openapi_parser.get_endpoint_by_method_path(
+                step.method, step.path
+            )
+        else:
+            return None
+
+        if not endpoint:
+            return None
+
+        operation = endpoint.get("operation")
+        if not operation:
+            return None
+
+        # OpenAPI 3.0: requestBody.content.application/json.schema
+        if "requestBody" in operation:
+            request_body = operation["requestBody"]
+            content = request_body.get("content", {})
+            if content:
+                # Try application/json first, then any content type
+                for content_type in ["application/json", *content.keys()]:
+                    if content_type in content:
+                        media_type = content[content_type]
+                        if "schema" in media_type:
+                            return self.openapi_parser._resolve_schema_ref(
+                                media_type["schema"]
+                            )
+            return None
+
+        # Swagger 2.0: parameters with in=body
+        parameters = operation.get("parameters", [])
+        for param in parameters:
+            if param.get("in") == "body" and "schema" in param:
+                return self.openapi_parser._resolve_schema_ref(param["schema"])
+
+        return None
+
+    def _schema_has_matching_field(self, schema: dict[str, Any], var_name: str) -> bool:
+        """Check if schema has a field matching the variable name.
+
+        Args:
+            schema: JSON Schema object
+            var_name: Variable name to match
+
+        Returns:
+            True if schema has a matching field
+        """
+        field_index = self._build_field_index(schema)
+        var_lower = var_name.lower()
+        for field_name in field_index.keys():
+            if field_name.lower() == var_lower:
+                return True
         return False
 
     def _dict_contains_pattern(self, data: Any, pattern: str) -> bool:

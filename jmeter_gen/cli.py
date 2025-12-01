@@ -82,7 +82,7 @@ def _get_spec_status(spec_path: str) -> str:
 
 
 @click.group()
-@click.version_option(version="3.0.0", prog_name="jmeter-gen")
+@click.version_option(version="3.1.0", prog_name="jmeter-gen")
 def cli():
     """JMeter Test Generator - Generate JMX test plans from OpenAPI specifications.
 

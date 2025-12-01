@@ -454,3 +454,170 @@ paths:
         assert len(result.mappings) == 1
         mapping = result.mappings[0]
         assert "items" in mapping.jsonpath
+
+
+class TestVariableUsageViaRequestBody:
+    """Tests for variable usage detection via request body schema."""
+
+    @pytest.fixture
+    def parser(self, tmp_path):
+        """Create a parser with spec where step 2 uses variables from step 1."""
+        spec_content = """openapi: 3.0.0
+info:
+  title: Agent API
+  version: 1.0.0
+paths:
+  /trigger:
+    post:
+      operationId: triggerAgent
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  correlationId:
+                    type: string
+                  sessionId:
+                    type: string
+                  chatId:
+                    type: string
+  /status:
+    post:
+      operationId: getStatus
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                sessionId:
+                  type: string
+                chatId:
+                  type: string
+              required:
+                - sessionId
+                - chatId
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+"""
+        spec_path = tmp_path / "agent.yaml"
+        spec_path.write_text(spec_content)
+        parser = OpenAPIParser()
+        parser.parse(str(spec_path))
+        return parser
+
+    @pytest.fixture
+    def analyzer(self, parser):
+        """Create an analyzer instance."""
+        return CorrelationAnalyzer(parser)
+
+    def test_variable_usage_via_request_body_operationid(self, analyzer):
+        """Test variable usage detection via request body schema (operationId format)."""
+        steps = [
+            ScenarioStep(
+                name="Trigger Agent",
+                endpoint="triggerAgent",
+                endpoint_type="operation_id",
+                captures=[
+                    CaptureConfig(variable_name="correlationId"),
+                    CaptureConfig(variable_name="sessionId"),
+                    CaptureConfig(variable_name="chatId"),
+                ],
+            ),
+            ScenarioStep(
+                name="Get Status",
+                endpoint="getStatus",
+                endpoint_type="operation_id",
+            ),
+        ]
+        scenario = ParsedScenario(
+            name="Test",
+            description=None,
+            settings=ScenarioSettings(),
+            variables={},
+            steps=steps,
+        )
+
+        result = analyzer.analyze(scenario)
+
+        # Find sessionId and chatId mappings from step 1
+        sessionId_mapping = next(
+            (m for m in result.mappings if m.variable_name == "sessionId" and m.source_step == 1),
+            None,
+        )
+        chatId_mapping = next(
+            (m for m in result.mappings if m.variable_name == "chatId" and m.source_step == 1),
+            None,
+        )
+        correlationId_mapping = next(
+            (m for m in result.mappings if m.variable_name == "correlationId" and m.source_step == 1),
+            None,
+        )
+
+        assert sessionId_mapping is not None
+        assert chatId_mapping is not None
+        assert correlationId_mapping is not None
+
+        # sessionId and chatId should be detected as used in step 2 (via request body schema)
+        assert 2 in sessionId_mapping.target_steps, "sessionId should be used in step 2"
+        assert 2 in chatId_mapping.target_steps, "chatId should be used in step 2"
+        # correlationId is NOT in /status request body, so should NOT be used in step 2
+        assert 2 not in correlationId_mapping.target_steps, "correlationId should not be used in step 2"
+
+    def test_variable_usage_via_request_body_method_path(self, analyzer):
+        """Test variable usage detection via request body schema (METHOD /path format)."""
+        steps = [
+            ScenarioStep(
+                name="Trigger Agent",
+                endpoint="POST /trigger",
+                endpoint_type="method_path",
+                method="POST",
+                path="/trigger",
+                captures=[
+                    CaptureConfig(variable_name="sessionId"),
+                    CaptureConfig(variable_name="chatId"),
+                ],
+            ),
+            ScenarioStep(
+                name="Get Status",
+                endpoint="POST /status",
+                endpoint_type="method_path",
+                method="POST",
+                path="/status",
+            ),
+        ]
+        scenario = ParsedScenario(
+            name="Test",
+            description=None,
+            settings=ScenarioSettings(),
+            variables={},
+            steps=steps,
+        )
+
+        result = analyzer.analyze(scenario)
+
+        sessionId_mapping = next(
+            (m for m in result.mappings if m.variable_name == "sessionId"),
+            None,
+        )
+        chatId_mapping = next(
+            (m for m in result.mappings if m.variable_name == "chatId"),
+            None,
+        )
+
+        assert sessionId_mapping is not None
+        assert chatId_mapping is not None
+        assert 2 in sessionId_mapping.target_steps, "sessionId should be used in step 2"
+        assert 2 in chatId_mapping.target_steps, "chatId should be used in step 2"

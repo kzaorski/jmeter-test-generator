@@ -13,6 +13,9 @@ from jmeter_gen.mcp_server import (
     _generate_scenario_jmx,
     _validate_jmx,
     _visualize_scenario,
+    _list_endpoints,
+    _suggest_captures,
+    _build_scenario,
     call_tool,
     list_tools,
 )
@@ -22,10 +25,10 @@ class TestListTools:
     """Tests for list_tools() handler."""
 
     @pytest.mark.asyncio
-    async def test_list_tools_returns_five_tools(self):
-        """Test that list_tools returns exactly 5 tools (v1 + v2)."""
+    async def test_list_tools_returns_eight_tools(self):
+        """Test that list_tools returns exactly 8 tools (v1 + v2 + v3)."""
         tools = await list_tools()
-        assert len(tools) == 5
+        assert len(tools) == 8
 
     @pytest.mark.asyncio
     async def test_list_tools_contains_analyze_project(self):
@@ -810,3 +813,258 @@ scenario:
         response = json.loads(result[0].text)
         assert response["success"] is True
         assert response["jmx_path"] == str(custom_output)
+
+
+class TestListEndpointsTool:
+    """Tests for list_endpoints tool (v3)."""
+
+    @pytest.mark.asyncio
+    async def test_list_tools_contains_list_endpoints(self):
+        """Test that list_endpoints tool is included."""
+        tools = await list_tools()
+        tool_names = [tool.name for tool in tools]
+        assert "list_endpoints" in tool_names
+
+    @pytest.mark.asyncio
+    async def test_list_endpoints_with_valid_spec(self, project_with_openapi_yaml: Path):
+        """Test listing endpoints from a valid spec."""
+        spec_path = project_with_openapi_yaml / "openapi.yaml"
+        result = await _list_endpoints({"spec_path": str(spec_path)})
+
+        response = json.loads(result[0].text)
+        assert response["success"] is True
+        assert "endpoints" in response
+        assert response["endpoints_count"] > 0
+        # Check endpoint structure
+        endpoint = response["endpoints"][0]
+        assert "method" in endpoint
+        assert "path" in endpoint
+
+    @pytest.mark.asyncio
+    async def test_list_endpoints_without_spec_path(self):
+        """Test error when spec_path is missing."""
+        result = await _list_endpoints({})
+
+        response = json.loads(result[0].text)
+        assert response["success"] is False
+        assert "error" in response
+
+    @pytest.mark.asyncio
+    async def test_list_endpoints_with_nonexistent_spec(self):
+        """Test error when spec file doesn't exist."""
+        result = await _list_endpoints({"spec_path": "/nonexistent/spec.yaml"})
+
+        response = json.loads(result[0].text)
+        assert response["success"] is False
+        assert "error" in response
+
+
+class TestSuggestCapturesTool:
+    """Tests for suggest_captures tool (v3)."""
+
+    @pytest.mark.asyncio
+    async def test_list_tools_contains_suggest_captures(self):
+        """Test that suggest_captures tool is included."""
+        tools = await list_tools()
+        tool_names = [tool.name for tool in tools]
+        assert "suggest_captures" in tool_names
+
+    @pytest.mark.asyncio
+    async def test_suggest_captures_with_operationid(self, tmp_path: Path):
+        """Test suggesting captures using operationId."""
+        # Create spec with response schema that has ID field
+        spec_path = tmp_path / "openapi.yaml"
+        spec_path.write_text("""
+openapi: "3.0.0"
+info:
+  title: "Test API"
+  version: "1.0.0"
+paths:
+  /users:
+    post:
+      operationId: createUser
+      responses:
+        201:
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  token:
+                    type: string
+""")
+        result = await _suggest_captures({
+            "spec_path": str(spec_path),
+            "endpoint": "createUser"
+        })
+
+        response = json.loads(result[0].text)
+        assert response["success"] is True
+        assert "suggestions" in response
+
+    @pytest.mark.asyncio
+    async def test_suggest_captures_with_method_path(self, tmp_path: Path):
+        """Test suggesting captures using METHOD /path format."""
+        spec_path = tmp_path / "openapi.yaml"
+        spec_path.write_text("""
+openapi: "3.0.0"
+info:
+  title: "Test API"
+  version: "1.0.0"
+paths:
+  /users:
+    post:
+      operationId: createUser
+      responses:
+        201:
+          description: Created
+""")
+        result = await _suggest_captures({
+            "spec_path": str(spec_path),
+            "endpoint": "POST /users"
+        })
+
+        response = json.loads(result[0].text)
+        assert response["success"] is True
+        assert response["endpoint"] == "POST /users"
+
+    @pytest.mark.asyncio
+    async def test_suggest_captures_endpoint_not_found(self, project_with_openapi_yaml: Path):
+        """Test error when endpoint doesn't exist."""
+        spec_path = project_with_openapi_yaml / "openapi.yaml"
+        result = await _suggest_captures({
+            "spec_path": str(spec_path),
+            "endpoint": "nonExistentOperation"
+        })
+
+        response = json.loads(result[0].text)
+        assert response["success"] is False
+        assert "error" in response
+
+
+class TestBuildScenarioTool:
+    """Tests for build_scenario tool (v3)."""
+
+    @pytest.mark.asyncio
+    async def test_list_tools_contains_build_scenario(self):
+        """Test that build_scenario tool is included."""
+        tools = await list_tools()
+        tool_names = [tool.name for tool in tools]
+        assert "build_scenario" in tool_names
+
+    @pytest.mark.asyncio
+    async def test_build_scenario_basic(self, tmp_path: Path):
+        """Test building a basic scenario."""
+        # Create spec
+        spec_path = tmp_path / "openapi.yaml"
+        spec_path.write_text("""
+openapi: "3.0.0"
+info:
+  title: "Test API"
+  version: "1.0.0"
+paths:
+  /users:
+    post:
+      operationId: createUser
+      responses:
+        201:
+          description: Created
+  /users/{id}:
+    get:
+      operationId: getUser
+      responses:
+        200:
+          description: OK
+""")
+        output_path = tmp_path / "pt_scenario.yaml"
+        result = await _build_scenario({
+            "spec_path": str(spec_path),
+            "name": "User Test",
+            "steps": [
+                {"endpoint": "createUser", "capture": ["userId"]},
+                {"endpoint": "GET /users/{id}"}
+            ],
+            "output_path": str(output_path)
+        })
+
+        response = json.loads(result[0].text)
+        assert response["success"] is True
+        assert response["steps_count"] == 2
+        assert output_path.exists()
+        assert "yaml_content" in response
+
+    @pytest.mark.asyncio
+    async def test_build_scenario_with_settings(self, tmp_path: Path):
+        """Test building scenario with settings."""
+        spec_path = tmp_path / "openapi.yaml"
+        spec_path.write_text("""
+openapi: "3.0.0"
+info:
+  title: "Test API"
+  version: "1.0.0"
+paths:
+  /users:
+    post:
+      operationId: createUser
+      responses:
+        201:
+          description: Created
+""")
+        output_path = tmp_path / "pt_scenario.yaml"
+        result = await _build_scenario({
+            "spec_path": str(spec_path),
+            "name": "Load Test",
+            "steps": [{"endpoint": "createUser"}],
+            "output_path": str(output_path),
+            "settings": {"threads": 10, "rampup": 5, "duration": 60}
+        })
+
+        response = json.loads(result[0].text)
+        assert response["success"] is True
+        yaml_content = response["yaml_content"]
+        assert "threads: 10" in yaml_content
+        assert "duration: 60" in yaml_content
+
+    @pytest.mark.asyncio
+    async def test_build_scenario_without_steps(self, project_with_openapi_yaml: Path):
+        """Test error when steps are missing."""
+        spec_path = project_with_openapi_yaml / "openapi.yaml"
+        result = await _build_scenario({
+            "spec_path": str(spec_path),
+            "steps": []
+        })
+
+        response = json.loads(result[0].text)
+        assert response["success"] is False
+        assert "error" in response
+
+    @pytest.mark.asyncio
+    async def test_build_scenario_warns_on_unknown_endpoint(self, tmp_path: Path):
+        """Test that warnings are generated for unknown endpoints."""
+        spec_path = tmp_path / "openapi.yaml"
+        spec_path.write_text("""
+openapi: "3.0.0"
+info:
+  title: "Test API"
+  version: "1.0.0"
+paths:
+  /users:
+    post:
+      operationId: createUser
+      responses:
+        201:
+          description: Created
+""")
+        output_path = tmp_path / "pt_scenario.yaml"
+        result = await _build_scenario({
+            "spec_path": str(spec_path),
+            "steps": [{"endpoint": "nonExistentOperation"}],
+            "output_path": str(output_path)
+        })
+
+        response = json.loads(result[0].text)
+        assert response["success"] is True  # Still succeeds
+        assert len(response["warnings"]) > 0  # But has warnings
