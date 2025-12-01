@@ -601,10 +601,10 @@ class JMXGenerator:
         method + path without separators when no explicit operationId is provided.
 
         Criteria for "ugly" operationId:
-        - All lowercase (no camelCase)
-        - No separators (_, -)
-        - Longer than 20 chars
-        - Starts with HTTP method name
+        - Contains version patterns like _1.0_ or _v1_ (strong signal of path-based)
+        - Has too many segments (more than 5 underscores/hyphens)
+        - Starts with method prefix AND very long (>35 chars)
+        - No separators, starts with method, and longer than 20 chars (FastAPI style)
 
         Args:
             operation_id: The operationId from spec
@@ -613,15 +613,36 @@ class JMXGenerator:
         Returns:
             True if operationId looks auto-generated and ugly
         """
+        import re
+
+        # Short names are always OK
         if len(operation_id) <= 20:
             return False
+
+        # Has camelCase = likely intentional = OK
         if not operation_id.islower():
-            return False  # Has capitals = likely camelCase = OK
-        if "_" in operation_id or "-" in operation_id:
-            return False  # Has separators = OK
+            return False
+
         method_lower = method.lower()
-        if operation_id.startswith(method_lower):
-            return True  # Starts with method = likely auto-generated
+
+        # Contains version patterns like _1.0_ or _v1_ = definitely path-based
+        if re.search(r"_v?\d+\.?\d*_", operation_id):
+            return True
+
+        # Too many segments (>5 underscores or hyphens) = path-based
+        segment_count = operation_id.count("_") + operation_id.count("-")
+        if segment_count > 5:
+            return True
+
+        # Starts with method prefix AND very long = likely path-based
+        if operation_id.startswith(f"{method_lower}_") and len(operation_id) > 35:
+            return True
+
+        # No separators, starts with method = FastAPI style (no explicit operationId)
+        if "_" not in operation_id and "-" not in operation_id:
+            if operation_id.startswith(method_lower):
+                return True
+
         return False
 
     def _create_name_from_path(self, path: str, method: str) -> str:
