@@ -5,6 +5,7 @@ and correlation results, providing a visual representation of test flows
 and variable dependencies.
 """
 
+import re
 from typing import Optional
 
 from jmeter_gen.core.scenario_data import (
@@ -13,6 +14,10 @@ from jmeter_gen.core.scenario_data import (
     ParsedScenario,
     ScenarioStep,
 )
+
+# Pattern to extract JSONPath field from while condition
+# e.g., "$.status != 'finished'" -> "status"
+JSONPATH_FIELD_PATTERN = re.compile(r"\$\.([a-zA-Z_][a-zA-Z0-9_]*)")
 
 
 def generate_mermaid_diagram(
@@ -128,6 +133,11 @@ def _build_node_label(
             loop_info = f"loop: {step.loop.count}x"
         elif step.loop and step.loop.while_condition:
             loop_info = f"while: {_escape_mermaid(step.loop.while_condition)}"
+            # Add auto-capture for while condition variable
+            match = JSONPATH_FIELD_PATTERN.search(step.loop.while_condition)
+            if match:
+                condition_var = match.group(1)
+                loop_info += f"<br/><i>auto-capture: {condition_var}</i>"
         else:
             loop_info = "loop"
 
@@ -153,6 +163,18 @@ def _build_node_label(
 
     # Build label with line breaks
     label = f"{step_number}. {name}<br/>{endpoint}"
+
+    # Add loop info for single-step loops
+    if step.loop:
+        if step.loop.count:
+            label += f"<br/>loop: {step.loop.count}x"
+        elif step.loop.while_condition:
+            label += f"<br/>while: {_escape_mermaid(step.loop.while_condition)}"
+            # Add auto-capture for while condition variable
+            match = JSONPATH_FIELD_PATTERN.search(step.loop.while_condition)
+            if match:
+                condition_var = match.group(1)
+                label += f"<br/><i>auto-capture: {condition_var}</i>"
 
     # Add captures annotation if any
     if captures:
@@ -246,6 +268,11 @@ def generate_text_visualization(
                 lines.append(f"    loop: {step.loop.count}x")
             elif step.loop and step.loop.while_condition:
                 lines.append(f"    while: {step.loop.while_condition}")
+                # Show auto-capture for while condition variable
+                match = JSONPATH_FIELD_PATTERN.search(step.loop.while_condition)
+                if match:
+                    condition_var = match.group(1)
+                    lines.append(f"    Auto-capture: {condition_var} (for condition)")
             for nested_idx, nested_step in enumerate(step.nested_steps, 1):
                 if nested_step.endpoint_type == "think_time":
                     lines.append(f"      [{nested_idx}] {nested_step.name}: {nested_step.think_time}ms")
@@ -261,6 +288,18 @@ def generate_text_visualization(
             lines.append(f"    {step.method} {step.path}")
         else:
             lines.append(f"    {step.endpoint}")
+
+        # Show loop info for single-step loops
+        if step.loop and step.endpoint_type not in ("think_time", "loop_block"):
+            if step.loop.count:
+                lines.append(f"    loop: {step.loop.count}x")
+            elif step.loop.while_condition:
+                lines.append(f"    while: {step.loop.while_condition}")
+                # Show auto-capture for while condition variable
+                match = JSONPATH_FIELD_PATTERN.search(step.loop.while_condition)
+                if match:
+                    condition_var = match.group(1)
+                    lines.append(f"    Auto-capture: {condition_var} (for condition)")
 
         # Captures
         if idx in captures_by_step:

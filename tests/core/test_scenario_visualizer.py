@@ -11,6 +11,7 @@ from jmeter_gen.core.scenario_data import (
     CaptureConfig,
     CorrelationMapping,
     CorrelationResult,
+    LoopConfig,
     ParsedScenario,
     ScenarioSettings,
     ScenarioStep,
@@ -397,3 +398,123 @@ class TestScenarioVisualizerEdgeCases:
         output = console_output.getvalue()
         # Should display warnings and errors
         assert "Low confidence" in output or "Warnings" in output
+
+
+class TestScenarioVisualizerWhileCondition:
+    """Tests for while condition auto-capture visualization."""
+
+    @pytest.fixture
+    def console_output(self):
+        """Create a string buffer for console output."""
+        return StringIO()
+
+    @pytest.fixture
+    def visualizer(self, console_output):
+        """Create a visualizer instance with captured output."""
+        console = Console(file=console_output, force_terminal=True, width=120)
+        return ScenarioVisualizer(console=console)
+
+    def test_single_step_while_loop_shows_auto_capture(self, visualizer, console_output):
+        """Test that single-step while loop shows auto-capture for condition variable."""
+        scenario = ParsedScenario(
+            name="While Loop Test",
+            description=None,
+            settings=ScenarioSettings(),
+            variables={},
+            steps=[
+                ScenarioStep(
+                    name="Poll Status",
+                    endpoint="GET /status",
+                    endpoint_type="method_path",
+                    method="GET",
+                    path="/status",
+                    loop=LoopConfig(
+                        while_condition="$.status != 'finished'",
+                        max_iterations=100,
+                        interval=1000,
+                    ),
+                )
+            ],
+        )
+
+        visualizer.visualize(scenario)
+        output = console_output.getvalue()
+
+        # Should show the while condition
+        assert "while" in output.lower()
+        assert "status" in output
+        # Should show auto-capture for the condition variable
+        assert "auto-capture" in output.lower()
+        assert "$.status" in output
+
+    def test_loop_block_while_shows_auto_capture(self, visualizer, console_output):
+        """Test that loop_block with while condition shows auto-capture."""
+        scenario = ParsedScenario(
+            name="Loop Block While Test",
+            description=None,
+            settings=ScenarioSettings(),
+            variables={},
+            steps=[
+                ScenarioStep(
+                    name="Poll with Delay",
+                    endpoint="loop_block",
+                    endpoint_type="loop_block",
+                    loop=LoopConfig(
+                        while_condition="$.jobStatus != 'complete'",
+                        max_iterations=50,
+                        interval=5000,
+                    ),
+                    nested_steps=[
+                        ScenarioStep(
+                            name="Check Job",
+                            endpoint="GET /job/status",
+                            endpoint_type="method_path",
+                            method="GET",
+                            path="/job/status",
+                        ),
+                        ScenarioStep(
+                            name="Wait",
+                            endpoint="think_time",
+                            endpoint_type="think_time",
+                            think_time=1000,
+                        ),
+                    ],
+                )
+            ],
+        )
+
+        visualizer.visualize(scenario)
+        output = console_output.getvalue()
+
+        # Should show the while condition
+        assert "while" in output.lower()
+        assert "jobStatus" in output
+        # Should show auto-capture for the condition variable
+        assert "auto-capture" in output.lower()
+
+    def test_fixed_count_loop_no_auto_capture(self, visualizer, console_output):
+        """Test that fixed count loop does not show auto-capture."""
+        scenario = ParsedScenario(
+            name="Count Loop Test",
+            description=None,
+            settings=ScenarioSettings(),
+            variables={},
+            steps=[
+                ScenarioStep(
+                    name="Repeat Action",
+                    endpoint="POST /action",
+                    endpoint_type="method_path",
+                    method="POST",
+                    path="/action",
+                    loop=LoopConfig(count=5),
+                )
+            ],
+        )
+
+        visualizer.visualize(scenario)
+        output = console_output.getvalue()
+
+        # Should show loop count
+        assert "count" in output.lower() or "5" in output
+        # Should NOT show auto-capture (no while condition)
+        assert "auto-capture" not in output.lower()

@@ -166,7 +166,7 @@ class ScenarioJMXGenerator:
 
                 # Handle think_time step - add ConstantTimer directly
                 if step.endpoint_type == "think_time" and step.think_time is not None:
-                    timer = self._create_constant_timer(step.think_time)
+                    timer = self._create_constant_timer(step.think_time, step.name)
                     thread_group_hashtree.append(timer)
                     ET.SubElement(thread_group_hashtree, "hashTree")
                     continue
@@ -357,7 +357,7 @@ class ScenarioJMXGenerator:
 
         # Handle think_time step
         if step.endpoint_type == "think_time" and step.think_time is not None:
-            timer = self._create_constant_timer(step.think_time)
+            timer = self._create_constant_timer(step.think_time, step.name)
             parent_hashtree.append(timer)
             ET.SubElement(parent_hashtree, "hashTree")
             return result
@@ -1178,11 +1178,12 @@ class ScenarioJMXGenerator:
             # Fallback: just use counter limit
             return f'${{__groovy(vars.getIteration() <= {max_iterations})}}'
 
-    def _create_constant_timer(self, delay_ms: int) -> ET.Element:
-        """Create ConstantTimer element for delays between loop iterations.
+    def _create_constant_timer(self, delay_ms: int, name: str = "Loop Interval") -> ET.Element:
+        """Create ConstantTimer element for delays.
 
         Args:
             delay_ms: Delay in milliseconds
+            name: Timer name (default: "Loop Interval")
 
         Returns:
             ConstantTimer XML Element
@@ -1192,7 +1193,7 @@ class ScenarioJMXGenerator:
             {
                 "guiclass": "ConstantTimerGui",
                 "testclass": "ConstantTimer",
-                "testname": "Loop Interval",
+                "testname": name,
                 "enabled": "true",
             },
         )

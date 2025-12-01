@@ -4,6 +4,7 @@ This module provides Rich-based terminal visualization for scenario flows,
 showing steps, variable dependencies, and correlation mappings.
 """
 
+import re
 from typing import Optional
 
 from rich.console import Console
@@ -17,6 +18,10 @@ from jmeter_gen.core.scenario_data import (
     ParsedScenario,
     ScenarioStep,
 )
+
+# Pattern to extract JSONPath field from while condition
+# e.g., "$.status != 'finished'" -> "status"
+JSONPATH_FIELD_PATTERN = re.compile(r"\$\.([a-zA-Z_][a-zA-Z0-9_]*)")
 
 
 class ScenarioVisualizer:
@@ -154,6 +159,14 @@ class ScenarioVisualizer:
                 content.append(f"loop: count={step.loop.count}", style="magenta")
             elif step.loop and step.loop.while_condition:
                 content.append(f"loop: while={step.loop.while_condition}, max={step.loop.max_iterations}", style="magenta")
+                # Show auto-capture for while condition variable in loop_block
+                match = JSONPATH_FIELD_PATTERN.search(step.loop.while_condition)
+                if match:
+                    condition_var = match.group(1)
+                    content.append("\n")
+                    content.append("auto-capture: ", style="yellow dim")
+                    content.append(f"{condition_var} ($.{condition_var}) ", style="yellow dim")
+                    content.append("[AUTO]", style="dim")
             if step.loop and step.loop.interval:
                 interval_sec = step.loop.interval / 1000
                 if interval_sec >= 1:
@@ -243,6 +256,16 @@ class ScenarioVisualizer:
             if step.loop.while_condition:
                 loop_parts.append(f"while: {step.loop.while_condition}")
                 loop_parts.append(f"max={step.loop.max_iterations}")
+                # Show auto-capture for while condition variable
+                match = JSONPATH_FIELD_PATTERN.search(step.loop.while_condition)
+                if match:
+                    condition_var = match.group(1)
+                    content.append(", ".join(loop_parts), style="magenta")
+                    content.append("\n")
+                    content.append("auto-capture: ", style="yellow dim")
+                    content.append(f"{condition_var} ($.{condition_var}) ", style="yellow dim")
+                    content.append("[AUTO]", style="dim")
+                    loop_parts = []  # Already appended
             if step.loop.interval:
                 # Format interval (ms to human readable)
                 interval_sec = step.loop.interval / 1000
@@ -251,7 +274,8 @@ class ScenarioVisualizer:
                 else:
                     interval_str = f"{step.loop.interval}ms"
                 loop_parts.append(f"interval={interval_str}")
-            content.append(", ".join(loop_parts), style="magenta")
+            if loop_parts:
+                content.append(", ".join(loop_parts), style="magenta")
 
         # Build title
         title = f"[{index}] {step.name}"

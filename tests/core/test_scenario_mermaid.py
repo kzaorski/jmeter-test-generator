@@ -12,6 +12,7 @@ from jmeter_gen.core.scenario_data import (
     CaptureConfig,
     CorrelationMapping,
     CorrelationResult,
+    LoopConfig,
     ParsedScenario,
     ScenarioSettings,
     ScenarioStep,
@@ -340,3 +341,193 @@ class TestBuildNodeLabel:
 
         assert "captures: userId, token" in label
         assert "<i>" in label
+
+
+class TestWhileConditionAutoCapture:
+    """Tests for while condition auto-capture visualization."""
+
+    def test_mermaid_single_step_while_shows_auto_capture(self):
+        """Test that single-step while loop shows auto-capture in Mermaid diagram."""
+        scenario = ParsedScenario(
+            name="While Loop Test",
+            description=None,
+            settings=ScenarioSettings(),
+            variables={},
+            steps=[
+                ScenarioStep(
+                    name="Poll Status",
+                    endpoint="GET /status",
+                    endpoint_type="method_path",
+                    method="GET",
+                    path="/status",
+                    loop=LoopConfig(
+                        while_condition="$.status != 'finished'",
+                        max_iterations=100,
+                    ),
+                )
+            ],
+        )
+
+        diagram = generate_mermaid_diagram(scenario)
+
+        # Should show the while condition
+        assert "while" in diagram.lower()
+        # Should show auto-capture for the condition variable
+        assert "auto-capture" in diagram.lower()
+        assert "status" in diagram
+
+    def test_mermaid_loop_block_while_shows_auto_capture(self):
+        """Test that loop_block with while condition shows auto-capture in Mermaid."""
+        scenario = ParsedScenario(
+            name="Loop Block While Test",
+            description=None,
+            settings=ScenarioSettings(),
+            variables={},
+            steps=[
+                ScenarioStep(
+                    name="Poll with Delay",
+                    endpoint="loop_block",
+                    endpoint_type="loop_block",
+                    loop=LoopConfig(
+                        while_condition="$.jobStatus != 'complete'",
+                        max_iterations=50,
+                    ),
+                    nested_steps=[
+                        ScenarioStep(
+                            name="Check Job",
+                            endpoint="GET /job/status",
+                            endpoint_type="method_path",
+                            method="GET",
+                            path="/job/status",
+                        ),
+                    ],
+                )
+            ],
+        )
+
+        diagram = generate_mermaid_diagram(scenario)
+
+        # Should show the while condition
+        assert "while" in diagram.lower()
+        # Should show auto-capture for the condition variable
+        assert "auto-capture" in diagram.lower()
+        assert "jobStatus" in diagram
+
+    def test_mermaid_fixed_count_loop_no_auto_capture(self):
+        """Test that fixed count loop does not show auto-capture in Mermaid."""
+        scenario = ParsedScenario(
+            name="Count Loop Test",
+            description=None,
+            settings=ScenarioSettings(),
+            variables={},
+            steps=[
+                ScenarioStep(
+                    name="Repeat Action",
+                    endpoint="POST /action",
+                    endpoint_type="method_path",
+                    method="POST",
+                    path="/action",
+                    loop=LoopConfig(count=5),
+                )
+            ],
+        )
+
+        diagram = generate_mermaid_diagram(scenario)
+
+        # Should show loop count
+        assert "loop" in diagram.lower() or "5x" in diagram
+        # Should NOT show auto-capture (no while condition)
+        assert "auto-capture" not in diagram.lower()
+
+    def test_text_single_step_while_shows_auto_capture(self):
+        """Test that single-step while loop shows auto-capture in text visualization."""
+        scenario = ParsedScenario(
+            name="While Loop Test",
+            description=None,
+            settings=ScenarioSettings(),
+            variables={},
+            steps=[
+                ScenarioStep(
+                    name="Poll Status",
+                    endpoint="GET /status",
+                    endpoint_type="method_path",
+                    method="GET",
+                    path="/status",
+                    loop=LoopConfig(
+                        while_condition="$.status != 'finished'",
+                        max_iterations=100,
+                    ),
+                )
+            ],
+        )
+
+        text = generate_text_visualization(scenario)
+
+        # Should show the while condition
+        assert "while" in text.lower()
+        assert "status" in text
+        # Should show auto-capture for the condition variable
+        assert "Auto-capture" in text
+
+    def test_text_loop_block_while_shows_auto_capture(self):
+        """Test that loop_block with while shows auto-capture in text visualization."""
+        scenario = ParsedScenario(
+            name="Loop Block While Test",
+            description=None,
+            settings=ScenarioSettings(),
+            variables={},
+            steps=[
+                ScenarioStep(
+                    name="Poll with Delay",
+                    endpoint="loop_block",
+                    endpoint_type="loop_block",
+                    loop=LoopConfig(
+                        while_condition="$.jobStatus != 'complete'",
+                        max_iterations=50,
+                    ),
+                    nested_steps=[
+                        ScenarioStep(
+                            name="Check Job",
+                            endpoint="GET /job/status",
+                            endpoint_type="method_path",
+                            method="GET",
+                            path="/job/status",
+                        ),
+                    ],
+                )
+            ],
+        )
+
+        text = generate_text_visualization(scenario)
+
+        # Should show the while condition
+        assert "while" in text.lower()
+        assert "jobStatus" in text
+        # Should show auto-capture for the condition variable
+        assert "Auto-capture" in text
+
+    def test_text_fixed_count_loop_no_auto_capture(self):
+        """Test that fixed count loop does not show auto-capture in text visualization."""
+        scenario = ParsedScenario(
+            name="Count Loop Test",
+            description=None,
+            settings=ScenarioSettings(),
+            variables={},
+            steps=[
+                ScenarioStep(
+                    name="Repeat Action",
+                    endpoint="POST /action",
+                    endpoint_type="method_path",
+                    method="POST",
+                    path="/action",
+                    loop=LoopConfig(count=5),
+                )
+            ],
+        )
+
+        text = generate_text_visualization(scenario)
+
+        # Should show loop count
+        assert "loop" in text.lower() or "5x" in text
+        # Should NOT show auto-capture (no while condition)
+        assert "Auto-capture" not in text
