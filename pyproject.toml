@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "jmeter-test-generator"
-version = "3.1.0"
+version = "3.2.0"
 description = "Generate JMeter JMX test plans from OpenAPI specifications"
 readme = "README.md"
 authors = [

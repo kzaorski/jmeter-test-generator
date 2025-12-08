@@ -31,6 +31,7 @@ from jmeter_gen.core.ptscenario_parser import PtScenarioParser
 from jmeter_gen.core.correlation_analyzer import CorrelationAnalyzer
 from jmeter_gen.core.scenario_visualizer import ScenarioVisualizer
 from jmeter_gen.core.scenario_jmx_generator import ScenarioJMXGenerator
+from jmeter_gen.core.scenario_validator import ScenarioValidator
 
 # v3 imports
 from jmeter_gen.core.scenario_wizard import ScenarioWizard
@@ -82,7 +83,7 @@ def _get_spec_status(spec_path: str) -> str:
 
 
 @click.group()
-@click.version_option(version="3.1.0", prog_name="jmeter-gen")
+@click.version_option(version="3.2.2", prog_name="jmeter-gen")
 def cli():
     """JMeter Test Generator - Generate JMX test plans from OpenAPI specifications.
 
@@ -93,6 +94,7 @@ def cli():
 
 
 @cli.command()
+@click.pass_context
 @click.option(
     "--path",
     default=".",
@@ -120,6 +122,7 @@ def cli():
     help="JMX file path for snapshot lookup",
 )
 def analyze(
+    ctx: click.Context,
     path: str,
     no_detect_changes: bool,
     show_details: bool,
@@ -248,15 +251,23 @@ def analyze(
                 scenario = scenario_parser.parse(scenario_path)
                 console.print(f"  [dim]Name:[/dim] {scenario.name}")
                 console.print(f"  [dim]Steps:[/dim] {len(scenario.steps)}")
-                console.print(
-                    f"\n[dim]Next step:[/dim] jmeter-gen generate "
-                    f"[dim](will use scenario-based generation)[/dim]"
-                )
+                # Prompt to run generate
+                if click.confirm("\nRun generate now?", default=True):
+                    ctx.invoke(generate)
+                else:
+                    console.print(
+                        "[dim]Next step: jmeter-gen generate "
+                        "(will use scenario-based generation)[/dim]"
+                    )
             except Exception as e:
                 console.print(f"  [yellow]Warning: Could not parse scenario: {e}[/yellow]")
-                console.print(f"\n[dim]Next step:[/dim] jmeter-gen generate")
+                # No suggestion when scenario parsing fails - user must fix scenario first
         else:
-            console.print(f"\n[dim]Next step:[/dim] jmeter-gen generate")
+            # Prompt to run generate
+            if click.confirm("\nRun generate now?", default=True):
+                ctx.invoke(generate)
+            else:
+                console.print("[dim]Next step: jmeter-gen generate[/dim]")
 
     except (OSError, ValueError) as e:
         console.print(f"\n[bold red]Error:[/bold red] {e}")
@@ -522,6 +533,16 @@ def generate(
                     console.print("\n[red]Correlation errors:[/red]")
                     for e in result["correlation_errors"]:
                         console.print(f"  [red]x[/red] {e}")
+
+                # Auto-validate generated JMX
+                validator = JMXValidator()
+                val_result = validator.validate(str(output))
+                if val_result["valid"]:
+                    console.print("\n[green]Validation: PASSED[/green]")
+                else:
+                    console.print(f"\n[yellow]Validation: {len(val_result['issues'])} issue(s)[/yellow]")
+                    for issue in val_result["issues"]:
+                        console.print(f"  [dim]- {issue}[/dim]")
             else:
                 console.print(f"\n[bold red]Error:[/bold red] Scenario JMX generation failed")
                 sys.exit(1)
@@ -683,6 +704,16 @@ def generate(
                 border_style="green",
             )
             console.print(panel)
+
+            # Auto-validate generated JMX
+            validator = JMXValidator()
+            val_result = validator.validate(str(output))
+            if val_result["valid"]:
+                console.print("[green]Validation: PASSED[/green]")
+            else:
+                console.print(f"[yellow]Validation: {len(val_result['issues'])} issue(s)[/yellow]")
+                for issue in val_result["issues"]:
+                    console.print(f"  [dim]- {issue}[/dim]")
         else:
             console.print(
                 f"\n[bold red]Error:[/bold red] JMX generation failed"
@@ -698,60 +729,181 @@ def generate(
 
 
 @cli.command()
-@click.argument("jmx_path", type=click.Path(exists=True))
-def validate(jmx_path: str):
-    """Validate JMX test plan structure and configuration.
+@click.argument("target_type", type=click.Choice(["script", "scenario"]))
+@click.argument("path", required=False, type=click.Path())
+@click.option("--spec", "-s", type=click.Path(exists=True), help="OpenAPI spec path (for scenario validation)")
+def validate(target_type: str, path: Optional[str], spec: Optional[str]) -> None:
+    """Validate JMX script or scenario file.
 
-    Checks the JMX file for required elements, valid configuration,
-    and provides recommendations for improvements.
+    Validate JMX test plan structure or scenario file content before generation.
 
-    Example:
-        jmeter-gen validate test.jmx
-        jmeter-gen validate /path/to/performance-test.jmx
+    Examples:
+        jmeter-gen validate script                    # Auto-detect .jmx in current dir
+        jmeter-gen validate script test.jmx           # Specific JMX file
+        jmeter-gen validate scenario                  # Auto-detect pt_scenario.yaml
+        jmeter-gen validate scenario my.yaml          # Specific scenario file
+        jmeter-gen validate scenario --spec openapi.yaml
     """
     try:
-        console.print(f"\n[bold]Validating JMX file:[/bold] {jmx_path}\n")
+        if target_type == "script":
+            _validate_jmx(path)
+        else:  # scenario
+            _validate_scenario(path, spec)
 
-        validator = JMXValidator()
-        result = validator.validate(jmx_path)
-
-        if result["valid"]:
-            console.print(
-                Panel(
-                    "[bold green]✓ JMX file is valid![/bold green]",
-                    border_style="green",
-                )
-            )
-        else:
-            console.print(
-                Panel(
-                    f"[bold red]✗ JMX file has {len(result['issues'])} issue(s)[/bold red]",
-                    border_style="red",
-                )
-            )
-
-            # Display issues
-            if result["issues"]:
-                console.print("\n[bold red]Issues Found:[/bold red]")
-                for i, issue in enumerate(result["issues"], 1):
-                    console.print(f"  {i}. {issue}")
-
-        # Display recommendations
-        if result["recommendations"]:
-            console.print(f"\n[bold yellow]Recommendations:[/bold yellow]")
-            for i, rec in enumerate(result["recommendations"], 1):
-                console.print(f"  {i}. {rec}")
-
-        console.print()
-
-        if not result["valid"]:
-            sys.exit(1)
-
-    except FileNotFoundError:
-        console.print(f"\n[bold red]Error:[/bold red] File not found: {jmx_path}")
+    except FileNotFoundError as e:
+        console.print(f"\n[bold red]Error:[/bold red] {e}")
         sys.exit(1)
     except Exception as e:
         console.print(f"\n[bold red]Error:[/bold red] {e}")
+        sys.exit(1)
+
+
+def _validate_jmx(jmx_path: Optional[str]) -> None:
+    """Validate JMX file.
+
+    Args:
+        jmx_path: Path to JMX file (auto-detect if None)
+
+    Raises:
+        FileNotFoundError: File not found
+    """
+    # Auto-detect JMX file if not provided
+    if not jmx_path:
+        jmx_files = list(Path(".").glob("*.jmx"))
+        if not jmx_files:
+            raise FileNotFoundError("No .jmx files found in current directory")
+        if len(jmx_files) > 1:
+            raise FileNotFoundError(f"Multiple .jmx files found, please specify one: {[str(f) for f in jmx_files]}")
+        jmx_path = str(jmx_files[0])
+
+    # Validate file exists
+    jmx_file = Path(jmx_path)
+    if not jmx_file.exists():
+        raise FileNotFoundError(f"JMX file not found: {jmx_path}")
+
+    console.print(f"\n[bold]Validating JMX script:[/bold] {jmx_path}\n")
+
+    validator = JMXValidator()
+    result = validator.validate(jmx_path)
+
+    if result["valid"]:
+        console.print(
+            Panel(
+                "[bold green]✓ JMX file is valid![/bold green]",
+                border_style="green",
+            )
+        )
+    else:
+        console.print(
+            Panel(
+                f"[bold red]✗ JMX file has {len(result['issues'])} issue(s)[/bold red]",
+                border_style="red",
+            )
+        )
+
+        # Display issues
+        if result["issues"]:
+            console.print("\n[bold red]Issues Found:[/bold red]")
+            for i, issue in enumerate(result["issues"], 1):
+                console.print(f"  {i}. {issue}")
+
+    # Display recommendations
+    if result["recommendations"]:
+        console.print(f"\n[bold yellow]Recommendations:[/bold yellow]")
+        for i, rec in enumerate(result["recommendations"], 1):
+            console.print(f"  {i}. {rec}")
+
+    console.print()
+
+    if not result["valid"]:
+        sys.exit(1)
+
+
+def _validate_scenario(scenario_path: Optional[str], spec_path: Optional[str]) -> None:
+    """Validate scenario file.
+
+    Args:
+        scenario_path: Path to pt_scenario.yaml (auto-detect if None)
+        spec_path: Path to OpenAPI spec (auto-detect if None)
+
+    Raises:
+        FileNotFoundError: File not found
+    """
+    # Auto-detect scenario file if not provided
+    if not scenario_path:
+        scenario_files = list(Path(".").glob("pt_scenario.yaml")) + list(Path(".").glob("*_scenario.yaml"))
+        if not scenario_files:
+            raise FileNotFoundError("No scenario files found in current directory (looking for pt_scenario.yaml)")
+        scenario_path = str(scenario_files[0])
+
+    # Validate scenario file exists
+    scenario_file = Path(scenario_path)
+    if not scenario_file.exists():
+        raise FileNotFoundError(f"Scenario file not found: {scenario_path}")
+
+    console.print(f"\n[bold]Validating scenario file:[/bold] {scenario_path}\n")
+
+    # Auto-detect spec if not provided
+    if not spec_path:
+        from jmeter_gen.core.project_analyzer import ProjectAnalyzer
+        analyzer = ProjectAnalyzer()
+        spec_info = analyzer.find_openapi_spec(str(scenario_file.parent))
+        if spec_info:
+            spec_path = spec_info["path"]
+
+    # Validate scenario
+    validator = ScenarioValidator()
+    result = validator.validate(scenario_path, spec_path)
+
+    # Display scenario info
+    scenario_info = ""
+    if result.scenario_name:
+        scenario_info = f": {result.scenario_name}"
+    console.print(f"Scenario{scenario_info}")
+    if spec_path:
+        console.print(f"OpenAPI Spec: {spec_path}")
+
+    console.print()
+
+    # Display validation results
+    if result.is_valid:
+        console.print(
+            Panel(
+                f"[bold green]✓ Scenario is valid! ({result.warnings_count} warning(s))[/bold green]",
+                border_style="green",
+            )
+        )
+    else:
+        console.print(
+            Panel(
+                f"[bold red]✗ Scenario has {result.errors_count} error(s), {result.warnings_count} warning(s)[/bold red]",
+                border_style="red",
+            )
+        )
+
+    # Display issues grouped by level
+    if result.issues:
+        errors = [i for i in result.issues if i.level == "error"]
+        warnings = [i for i in result.issues if i.level == "warning"]
+
+        if errors:
+            console.print("\n[bold red]Errors (blocking):[/bold red]")
+            for i, issue in enumerate(errors, 1):
+                console.print(f"  {i}. [{issue.category.upper()}] {issue.message}")
+                if issue.location:
+                    console.print(f"     Location: {issue.location}")
+
+        if warnings:
+            console.print("\n[bold yellow]Warnings (non-blocking):[/bold yellow]")
+            for i, issue in enumerate(warnings, 1):
+                console.print(f"  {i}. [{issue.category.upper()}] {issue.message}")
+                if issue.location:
+                    console.print(f"     Location: {issue.location}")
+
+    console.print()
+
+    # Exit with error if validation failed
+    if not result.is_valid:
         sys.exit(1)
 
 
@@ -768,7 +920,9 @@ def mcp():
     try:
         from jmeter_gen.mcp_server import run_server
 
-        console.print(
+        # MCP uses stdout for JSON-RPC, so print to stderr instead
+        stderr_console = Console(stderr=True)
+        stderr_console.print(
             Panel(
                 "[bold green]Starting MCP Server...[/bold green]\n\n"
                 "The server is now running and ready to accept connections.\n"
@@ -782,9 +936,11 @@ def mcp():
         run_server()
 
     except KeyboardInterrupt:
-        console.print("\n[yellow]MCP Server stopped by user[/yellow]")
+        stderr_console = Console(stderr=True)
+        stderr_console.print("\n[yellow]MCP Server stopped by user[/yellow]")
     except Exception as e:
-        console.print(f"\n[bold red]Error starting MCP server:[/bold red] {e}")
+        stderr_console = Console(stderr=True)
+        stderr_console.print(f"\n[bold red]Error starting MCP server:[/bold red] {e}")
         sys.exit(1)
 
 
@@ -795,6 +951,7 @@ def new():
 
 
 @new.command("scenario")
+@click.pass_context
 @click.option(
     "--spec",
     "-s",
@@ -807,7 +964,7 @@ def new():
     default="pt_scenario.yaml",
     help="Output file name (default: pt_scenario.yaml)",
 )
-def new_scenario(spec: Optional[str], output: str):
+def new_scenario(ctx: click.Context, spec: Optional[str], output: str):
     """Interactive wizard to create pt_scenario.yaml.
 
     Guides you through step-by-step scenario building with:
@@ -891,9 +1048,11 @@ def new_scenario(spec: Optional[str], output: str):
         if think_times:
             console.print(f"  {think_times} think time(s) configured")
 
-        console.print(
-            f"\n[dim]Next step: jmeter-gen generate[/dim]"
-        )
+        # Prompt to run generate
+        if click.confirm("\nRun generate now?", default=True):
+            ctx.invoke(generate)
+        else:
+            console.print("[dim]Next step: jmeter-gen generate[/dim]")
 
     except KeyboardInterrupt:
         console.print("\n[yellow]Wizard cancelled.[/yellow]")

@@ -576,12 +576,45 @@ scenario:
 
 The parser validates the following:
 
-1. **Required fields**: `version`, `name`, `scenario`
+1. **Required fields**: `name`, `scenario`
 2. **Endpoint existence**: All `endpoint` values must match either:
    - An operationId in the OpenAPI spec, OR
    - A valid METHOD /path combination that exists in the spec
 3. **Variable definitions**: Variables must be defined before use (in `variables` or `capture`)
 4. **Type consistency**: `params` and `payload` types should match OpenAPI schema (warning only)
+
+### Error vs Warning Distinction
+
+**Errors (blocking)** - Prevents JMX generation:
+- Invalid YAML syntax
+- Missing required fields (`name`, `scenario`)
+- Undefined variable usage
+- Endpoint not found in OpenAPI spec
+- Invalid endpoint format
+
+**Warnings (non-blocking)** - Allow generation but flag issues:
+- Type mismatches between params/payload and schema
+- Unused captures
+- Deprecated syntax
+
+### Validating Scenario Files
+
+Use the CLI to validate before generation:
+
+```bash
+# Auto-detect pt_scenario.yaml
+jmeter-gen validate scenario
+
+# With explicit spec path
+jmeter-gen validate scenario pt_scenario.yaml --spec openapi.yaml
+```
+
+Output shows:
+- [OK] Checks that passed
+- [ERROR] Blocking issues (generation will fail)
+- [WARN] Non-blocking issues (generation will proceed)
+
+Always validate before running `jmeter-gen generate` to catch errors early.
 
 ### Error Messages
 

@@ -169,6 +169,25 @@ The wizard guides you through:
 4. Capture suggestions from response schema
 5. Loop and think time configuration
 
+### Validate Scenario
+
+**Always validate before generating** to catch errors early:
+
+```bash
+# Auto-detects pt_scenario.yaml
+jmeter-gen validate scenario
+
+# Or specify explicitly
+jmeter-gen validate scenario pt_scenario.yaml --spec openapi.yaml
+```
+
+Output shows:
+- YAML syntax validation
+- Required fields check
+- Endpoint existence in spec
+- Variable lifecycle (undefined usage)
+- Loop configuration
+
 ### Example pt_scenario.yaml
 
 ```yaml

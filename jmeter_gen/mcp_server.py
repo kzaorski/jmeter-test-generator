@@ -37,6 +37,7 @@ from jmeter_gen.core.scenario_mermaid import (
 # v3 imports
 import yaml
 from jmeter_gen.core.scenario_wizard import ScenarioWizard
+from jmeter_gen.core.scenario_validator import ScenarioValidator
 
 
 # Initialize MCP Server
@@ -54,11 +55,9 @@ async def list_tools() -> List[Tool]:
         Tool(
             name="analyze_project_for_jmeter",
             description=(
-                "Analyze a project directory to discover OpenAPI specifications. "
-                "Searches for common spec files (openapi.yaml, swagger.json, etc.) "
-                "and returns metadata about discovered specs including endpoint count, "
-                "API title, and recommended JMX filename. "
-                "Supports change detection to identify API changes since last snapshot."
+                "Use this tool FIRST when user wants JMeter tests for an API project. "
+                "Discovers OpenAPI/Swagger specs in the current directory (default) or specified path. "
+                "Returns spec location, API title, endpoint count, and recommended actions."
             ),
             inputSchema={
                 "type": "object",
@@ -226,10 +225,10 @@ async def list_tools() -> List[Tool]:
         Tool(
             name="list_endpoints",
             description=(
-                "List all endpoints from an OpenAPI specification. "
-                "Returns endpoint details including method, path, operationId, summary, "
-                "and whether the endpoint has a request body. Use this to show available "
-                "endpoints before building a test scenario."
+                "Use this tool FIRST when user wants to create a JMeter test scenario. "
+                "Lists all available API endpoints from an OpenAPI/Swagger spec. "
+                "Essential for understanding what endpoints are available before "
+                "building a test scenario. Returns method, path, operationId, and summary."
             ),
             inputSchema={
                 "type": "object",
@@ -245,9 +244,11 @@ async def list_tools() -> List[Tool]:
         Tool(
             name="suggest_captures",
             description=(
-                "Analyze an endpoint's response schema and suggest fields that can be "
-                "captured as variables (e.g., IDs, tokens). Returns suggested variable "
-                "names with their JSONPath expressions and confidence levels."
+                "Use this tool to find variables to capture from API responses "
+                "(e.g., IDs, tokens, status fields for polling). "
+                "Analyzes endpoint response schema and suggests JSONPath expressions. "
+                "Essential for scenarios that need to pass data between steps or "
+                "poll until a condition is met (e.g., status == 'completed')."
             ),
             inputSchema={
                 "type": "object",
@@ -267,10 +268,12 @@ async def list_tools() -> List[Tool]:
         Tool(
             name="build_scenario",
             description=(
-                "Build a pt_scenario.yaml file from a list of steps. Each step defines "
-                "an endpoint to call, optional variable captures, and optional loop/think_time. "
-                "Validates that all endpoints exist in the spec. Returns the generated YAML "
-                "content and saves it to the specified output path."
+                "Use this tool when the user describes a test scenario in natural language, "
+                "such as 'call /trigger then poll /status until completed' or "
+                "'create user, then get user details'. "
+                "Builds a pt_scenario.yaml file with sequential steps, variable capture, "
+                "and loop/polling support (e.g., while: '$.status != completed'). "
+                "Supports both operationId and 'METHOD /path' endpoint formats."
             ),
             inputSchema={
                 "type": "object",
@@ -336,6 +339,31 @@ async def list_tools() -> List[Tool]:
                 "required": ["spec_path", "steps"],
             },
         ),
+        Tool(
+            name="validate_scenario",
+            description=(
+                "Validate a pt_scenario.yaml file BEFORE generating JMX. "
+                "Use this tool after creating or modifying a scenario to catch errors early. "
+                "Checks: YAML syntax, required fields, endpoint existence in spec, "
+                "variable lifecycle (undefined usage), loop configuration, capture syntax. "
+                "Returns structured validation report with errors (blocking) and warnings. "
+                "RECOMMENDED: Always validate before calling generate_scenario_jmx."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "scenario_path": {
+                        "type": "string",
+                        "description": "Path to pt_scenario.yaml file",
+                    },
+                    "spec_path": {
+                        "type": "string",
+                        "description": "Path to OpenAPI spec for endpoint validation (optional, auto-detected)",
+                    },
+                },
+                "required": ["scenario_path"],
+            },
+        ),
     ]
 
 
@@ -369,6 +397,8 @@ async def call_tool(name: str, arguments: Any) -> List[TextContent]:
         return await _suggest_captures(arguments)
     elif name == "build_scenario":
         return await _build_scenario(arguments)
+    elif name == "validate_scenario":
+        return await _validate_scenario_tool(arguments)
     else:
         raise ValueError(f"Unknown tool: {name}")
 
@@ -793,6 +823,10 @@ async def _generate_scenario_jmx(arguments: Dict[str, Any]) -> List[TextContent]
                 )
             ]
 
+        # Auto-validate generated JMX
+        validator = JMXValidator()
+        validation_result = validator.validate(output_path)
+
         # Format response
         response = {
             "success": True,
@@ -813,6 +847,11 @@ async def _generate_scenario_jmx(arguments: Dict[str, Any]) -> List[TextContent]
                 "mappings_count": len(correlation_result.mappings),
                 "warnings": correlation_result.warnings,
                 "errors": correlation_result.errors,
+            },
+            "validation": {
+                "is_valid": validation_result["valid"],
+                "issues_count": len(validation_result.get("issues", [])),
+                "issues": validation_result.get("issues", []),
             },
             "next_steps": [
                 "Open the JMX file in JMeter GUI for review",
@@ -1320,6 +1359,10 @@ async def _build_scenario(arguments: Dict[str, Any]) -> List[TextContent]:
         # Save to file
         Path(output_path).write_text(yaml_content, encoding="utf-8")
 
+        # Auto-validate generated scenario
+        validator = ScenarioValidator()
+        validation_result = validator.validate(output_path, spec_path)
+
         response = {
             "success": True,
             "output_path": output_path,
@@ -1327,6 +1370,15 @@ async def _build_scenario(arguments: Dict[str, Any]) -> List[TextContent]:
             "steps_count": len(normalized_steps),
             "yaml_content": yaml_content,
             "warnings": warnings,
+            "validation": {
+                "is_valid": validation_result.is_valid,
+                "errors_count": validation_result.errors_count,
+                "warnings_count": validation_result.warnings_count,
+                "issues": [
+                    {"level": i.level, "category": i.category, "message": i.message}
+                    for i in validation_result.issues
+                ],
+            },
             "next_step": f"Use generate_scenario_jmx with scenario_path: {output_path} and spec_path: {spec_path}",
         }
 
@@ -1338,6 +1390,84 @@ async def _build_scenario(arguments: Dict[str, Any]) -> List[TextContent]:
                 type="text",
                 text=json.dumps(
                     {"success": False, "error": str(e), "error_type": type(e).__name__},
+                    indent=2,
+                ),
+            )
+        ]
+    except Exception as e:
+        return [
+            TextContent(
+                type="text",
+                text=json.dumps(
+                    {"success": False, "error": str(e), "error_type": type(e).__name__},
+                    indent=2,
+                ),
+            )
+        ]
+
+
+async def _validate_scenario_tool(arguments: Dict[str, Any]) -> List[TextContent]:
+    """Validate a pt_scenario.yaml file.
+
+    Args:
+        arguments: Dictionary with 'scenario_path' and optional 'spec_path' keys
+
+    Returns:
+        List with single TextContent containing validation results
+    """
+    try:
+        scenario_path = arguments.get("scenario_path")
+        spec_path = arguments.get("spec_path")
+
+        if not scenario_path:
+            return [
+                TextContent(
+                    type="text",
+                    text=json.dumps(
+                        {"success": False, "error": "Missing required parameter: scenario_path"},
+                        indent=2,
+                    ),
+                )
+            ]
+
+        validator = ScenarioValidator()
+        result = validator.validate(scenario_path, spec_path)
+
+        # Format issues
+        issues_formatted = []
+        for issue in result.issues:
+            issue_dict = {
+                "level": issue.level,
+                "category": issue.category,
+                "message": issue.message,
+            }
+            if issue.location:
+                issue_dict["location"] = issue.location
+            issues_formatted.append(issue_dict)
+
+        response = {
+            "success": True,
+            "scenario_path": result.scenario_path,
+            "scenario_name": result.scenario_name,
+            "is_valid": result.is_valid,
+            "errors_count": result.errors_count,
+            "warnings_count": result.warnings_count,
+            "issues": issues_formatted,
+            "next_step": (
+                f"Scenario is valid! Use generate_scenario_jmx to generate JMX."
+                if result.is_valid
+                else "Fix errors above and validate again."
+            ),
+        }
+
+        return [TextContent(type="text", text=json.dumps(response, indent=2))]
+
+    except FileNotFoundError as e:
+        return [
+            TextContent(
+                type="text",
+                text=json.dumps(
+                    {"success": False, "error": str(e), "error_type": "FileNotFoundError"},
                     indent=2,
                 ),
             )

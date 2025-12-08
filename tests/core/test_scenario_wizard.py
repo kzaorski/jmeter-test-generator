@@ -341,7 +341,6 @@ class TestScenarioWizard:
 
         result = wizard._build_scenario_dict()
 
-        assert result["version"] == "1.0"
         assert result["name"] == "Test Scenario"
         assert result["description"] == "Test description"
         assert result["settings"] == {"threads": 10, "rampup": 5}
@@ -361,14 +360,12 @@ class TestScenarioWizard:
     def test_to_yaml(self, wizard):
         """Test YAML conversion."""
         scenario = {
-            "version": "1.0",
             "name": "Test",
             "scenario": [{"name": "Step 1", "endpoint": "POST /users"}],
         }
 
         yaml_output = wizard._to_yaml(scenario)
 
-        assert "version:" in yaml_output
         assert "name: Test" in yaml_output
         assert "scenario:" in yaml_output
         assert "endpoint: POST /users" in yaml_output
@@ -376,7 +373,6 @@ class TestScenarioWizard:
     def test_save(self, wizard, tmp_path):
         """Test saving scenario to file."""
         scenario = {
-            "version": "1.0",
             "name": "Test Scenario",
             "scenario": [{"name": "Step 1", "endpoint": "POST /users"}],
         }

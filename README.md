@@ -84,8 +84,11 @@ jmeter-gen generate
 # Generate with custom configuration
 jmeter-gen generate --threads 50 --rampup 10 --duration 300 --output load-test.jmx
 
-# Validate existing JMX
-jmeter-gen validate performance-test.jmx
+# Validate JMX script
+jmeter-gen validate script performance-test.jmx
+
+# Validate scenario file
+jmeter-gen validate scenario pt_scenario.yaml --spec openapi.yaml
 
 # Create scenario interactively (wizard)
 jmeter-gen new scenario

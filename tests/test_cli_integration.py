@@ -49,7 +49,9 @@ class TestAnalyzeCommandIntegration:
         - Display correct metadata
         """
         runner = CliRunner()
-        result = runner.invoke(cli, ["analyze", "--path", str(project_with_openapi_yaml)])
+        result = runner.invoke(
+            cli, ["analyze", "--path", str(project_with_openapi_yaml)], input="n\n"
+        )
 
         assert result.exit_code == 0
         assert "openapi.yaml" in result.output
@@ -68,7 +70,7 @@ class TestAnalyzeCommandIntegration:
         """
         runner = CliRunner()
         result = runner.invoke(
-            cli, ["analyze", "--path", str(project_with_swagger2_yaml)]
+            cli, ["analyze", "--path", str(project_with_swagger2_yaml)], input="n\n"
         )
 
         assert result.exit_code == 0
@@ -84,7 +86,9 @@ class TestAnalyzeCommandIntegration:
         - Report correct nested path
         """
         runner = CliRunner()
-        result = runner.invoke(cli, ["analyze", "--path", str(project_with_nested_spec)])
+        result = runner.invoke(
+            cli, ["analyze", "--path", str(project_with_nested_spec)], input="n\n"
+        )
 
         assert result.exit_code == 0
         assert "openapi.yaml" in result.output
@@ -101,7 +105,7 @@ class TestAnalyzeCommandIntegration:
         """
         runner = CliRunner()
         result = runner.invoke(
-            cli, ["analyze", "--path", str(project_with_multiple_specs)]
+            cli, ["analyze", "--path", str(project_with_multiple_specs)], input="n\n"
         )
 
         assert result.exit_code == 0
@@ -621,7 +625,7 @@ class TestValidateCommandIntegration:
         assert gen_result.exit_code == 0
 
         # Now validate it
-        val_result = runner.invoke(cli, ["validate", str(jmx_path)])
+        val_result = runner.invoke(cli, ["validate", "script", str(jmx_path)])
 
         assert val_result.exit_code == 0
         assert "valid" in val_result.output.lower()
@@ -637,7 +641,7 @@ class TestValidateCommandIntegration:
         - Exit code indicates failure
         """
         runner = CliRunner()
-        result = runner.invoke(cli, ["validate", str(minimal_invalid_jmx)])
+        result = runner.invoke(cli, ["validate", "script", str(minimal_invalid_jmx)])
 
         assert result.exit_code == 1
         assert "issue" in result.output.lower()
@@ -651,7 +655,7 @@ class TestValidateCommandIntegration:
         - No crash or exception leak
         """
         runner = CliRunner()
-        result = runner.invoke(cli, ["validate", str(malformed_xml_file)])
+        result = runner.invoke(cli, ["validate", "script", str(malformed_xml_file)])
 
         assert result.exit_code == 1
         assert "error" in result.output.lower()
@@ -672,9 +676,9 @@ class TestEndToEndWorkflows:
         """
         runner = CliRunner()
 
-        # Step 1: Analyze
+        # Step 1: Analyze (decline to run generate now)
         analyze_result = runner.invoke(
-            cli, ["analyze", "--path", str(project_with_openapi_yaml)]
+            cli, ["analyze", "--path", str(project_with_openapi_yaml)], input="n\n"
         )
         assert analyze_result.exit_code == 0
 
@@ -725,7 +729,7 @@ class TestEndToEndWorkflows:
         assert gen_result.exit_code == 0
 
         # Validate
-        val_result = runner.invoke(cli, ["validate", str(jmx_path)])
+        val_result = runner.invoke(cli, ["validate", "script", str(jmx_path)])
         assert val_result.exit_code == 0
 
     def test_complete_workflow_analyze_generate_validate(
@@ -740,9 +744,9 @@ class TestEndToEndWorkflows:
         """
         runner = CliRunner()
 
-        # Step 1: Analyze
+        # Step 1: Analyze (decline to run generate now)
         analyze_result = runner.invoke(
-            cli, ["analyze", "--path", str(project_with_swagger2_yaml)]
+            cli, ["analyze", "--path", str(project_with_swagger2_yaml)], input="n\n"
         )
         assert analyze_result.exit_code == 0
         assert "swagger.yaml" in analyze_result.output
@@ -768,7 +772,7 @@ class TestEndToEndWorkflows:
         assert jmx_path.exists()
 
         # Step 3: Validate
-        validate_result = runner.invoke(cli, ["validate", str(jmx_path)])
+        validate_result = runner.invoke(cli, ["validate", "script", str(jmx_path)])
         assert validate_result.exit_code == 0
         assert "valid" in validate_result.output.lower()
 
@@ -965,15 +969,15 @@ class TestErrorScenariosIntegration:
         """Test validate command with missing JMX file.
 
         Verifies:
-        - File not found is caught by Click
+        - File not found is caught
         - Appropriate error message
-        - Exit code 2 (Click usage error)
+        - Exit code 1 (validation error)
         """
         runner = CliRunner()
-        result = runner.invoke(cli, ["validate", "/nonexistent/file.jmx"])
+        result = runner.invoke(cli, ["validate", "script", "/nonexistent/file.jmx"])
 
-        assert result.exit_code == 2
-        assert "does not exist" in result.output or "Error" in result.output
+        assert result.exit_code == 1
+        assert "does not exist" in result.output or "error" in result.output.lower()
 
 
 class TestEdgeCasesIntegration:
@@ -1213,7 +1217,7 @@ class TestEdgeCasesIntegration:
         assert gen_result.exit_code == 0
 
         # Validate and check for recommendations
-        val_result = runner.invoke(cli, ["validate", str(jmx_path)])
+        val_result = runner.invoke(cli, ["validate", "script", str(jmx_path)])
         assert val_result.exit_code == 0
 
         # Should have recommendations section
@@ -1307,6 +1311,7 @@ class TestChangeDetectionIntegration:
                 "--path",
                 str(project_with_openapi_yaml),
             ],
+            input="n\n",  # Decline to run generate now
         )
 
         assert result.exit_code == 0
@@ -1351,6 +1356,7 @@ class TestChangeDetectionIntegration:
                 "--jmx",
                 str(output_path),
             ],
+            input="n\n",  # Decline to run generate now
         )
 
         assert analyze_result.exit_code == 0
@@ -1411,6 +1417,7 @@ class TestChangeDetectionIntegration:
                     str(output_path),
                     "--show-details",
                 ],
+                input="n\n",  # Decline to run generate now
             )
 
             assert analyze_result.exit_code == 0
@@ -1592,6 +1599,7 @@ class TestChangeDetectionIntegration:
                     "--export-diff",
                     str(diff_path),
                 ],
+                input="n\n",  # Decline to run generate now
             )
 
             assert analyze_result.exit_code == 0

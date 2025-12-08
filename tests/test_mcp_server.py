@@ -26,9 +26,9 @@ class TestListTools:
 
     @pytest.mark.asyncio
     async def test_list_tools_returns_eight_tools(self):
-        """Test that list_tools returns exactly 8 tools (v1 + v2 + v3)."""
+        """Test that list_tools returns exactly 9 tools (v1 + v2 + v3)."""
         tools = await list_tools()
-        assert len(tools) == 8
+        assert len(tools) == 9
 
     @pytest.mark.asyncio
     async def test_list_tools_contains_analyze_project(self):

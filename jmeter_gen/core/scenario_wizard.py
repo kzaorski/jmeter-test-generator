@@ -1096,7 +1096,6 @@ class ScenarioWizard:
     def _build_scenario_dict(self) -> dict:
         """Build final scenario dictionary."""
         scenario: dict[str, Any] = {
-            "version": "1.0",
             "name": self.state.name,
         }
 

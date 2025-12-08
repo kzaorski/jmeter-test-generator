@@ -5,6 +5,55 @@ All notable changes to the JMeter Test Generator project will be documented in t
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.2] - 2025-12-03
+
+### Added
+- **Interactive "Run Generate" Prompt** - After `analyze` and `new scenario` commands
+  - Prompts "Run generate now? [Y/n]" instead of just showing suggestion
+  - If yes: runs `generate` command automatically
+  - If no: shows the traditional "Next step: jmeter-gen generate" suggestion
+
+### Changed
+- Removed next step suggestion when scenario parsing fails (user must fix scenario first)
+
+---
+
+## [3.2.1] - 2025-12-03
+
+### Added
+- **Automatic Validation** - All generation operations now automatically validate output
+  - CLI `generate` (OpenAPI) - JMX validation after generation
+  - CLI `generate --scenario` - JMX validation after generation
+  - MCP `generate_scenario_jmx` - JMX validation result included in response
+  - MCP `build_scenario` - Scenario validation result included in response
+- Validation results displayed in CLI output (PASSED / issue count)
+- MCP responses include structured `validation` object with issues
+
+### Changed
+- Consistent validation behavior across all generation paths
+
+---
+
+## [3.2.0] - 2025-12-03
+
+### Added
+- **Scenario Validator Tool** - Dedicated validation for pt_scenario.yaml before generation
+  - `jmeter-gen validate scenario` command for CLI validation
+  - `validate_scenario` MCP tool for AI agent integration
+  - ScenarioValidator module with structured ValidationResult
+  - Error vs warning distinction (errors block generation)
+  - Checks: YAML syntax, required fields, endpoint existence, variable lifecycle
+- Scenario validation in development workflow to catch errors early
+
+### Changed
+- `jmeter-gen validate` command now requires target type: `script` or `scenario`
+  - Old: `jmeter-gen validate test.jmx`
+  - New: `jmeter-gen validate script test.jmx`
+- MCP Server now provides 9 tools (was 8)
+- Updated existing tool descriptions to suggest validation workflow
+
+---
+
 ## [3.1.0] - 2025-12-01
 
 ### Added

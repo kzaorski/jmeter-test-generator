@@ -58,8 +58,11 @@ jmeter-gen generate
 # Generate with custom configuration
 jmeter-gen generate --threads 50 --rampup 10 --duration 300 --output performance-test.jmx
 
-# Validate existing JMX file
-jmeter-gen validate performance-test.jmx
+# Validate JMX script
+jmeter-gen validate script performance-test.jmx
+
+# Validate scenario BEFORE generating JMX - catches errors early!
+jmeter-gen validate scenario pt_scenario.yaml --spec openapi.yaml
 
 # Start MCP Server
 jmeter-gen mcp
@@ -161,7 +164,7 @@ Output (formatted response)
   - CLI commands: analyze, generate, validate, mcp (94% coverage)
   - Rich formatting, error handling, interactive prompts
 - **Phase 3: MCP Server** ✅ COMPLETED
-  - MCP Server with 8 tools (78% coverage)
+  - MCP Server with 9 tools (78% coverage)
   - `analyze_project_for_jmeter`: project_path, detect_changes, jmx_path, **scenario detection**
   - `generate_jmx_from_openapi`: spec_path, output_path, threads, rampup, duration, base_url, detect_changes, auto_update, export_diff_path
   - `generate_scenario_jmx`: scenario_path, spec_path, output_path, base_url_override, **auto-filename**
@@ -170,6 +173,7 @@ Output (formatted response)
   - `list_endpoints`: spec_path - list all endpoints from OpenAPI spec
   - `suggest_captures`: spec_path, endpoint - suggest capturable variables from response
   - `build_scenario`: spec_path, steps, name, settings - build pt_scenario.yaml from steps
+  - `validate_scenario`: **NEW** scenario_path, spec_path - validates pt_scenario.yaml before generation
   - Full async/await implementation
   - Integrated validation workflow
 - **Change Detection Modules** ✅ COMPLETED

@@ -16,6 +16,7 @@ Prioritized list of planned extensions for JMeter Test Generator.
 | Output folder prompt | Prompt for output folder when generating JMX (default: current directory) |
 | Transaction Controllers | Group samplers into logical transactions for aggregated metrics |
 | Scenario Init Wizard | Interactive `jmeter-gen new scenario` command (v3.0.0) |
+| Scenario Validator | Dedicated CLI and MCP tool for validating pt_scenario.yaml before generation (v3.2.0) |
 
 ---
 
