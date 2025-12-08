@@ -166,7 +166,7 @@ Output (formatted response)
 - **Phase 3: MCP Server** ✅ COMPLETED
   - MCP Server with 9 tools (78% coverage)
   - `analyze_project_for_jmeter`: project_path, detect_changes, jmx_path, **scenario detection**
-  - `generate_jmx_from_openapi`: spec_path, output_path, threads, rampup, duration, base_url, detect_changes, auto_update, export_diff_path
+  - `generate_jmx_from_openapi`: spec_path, output_path, threads, rampup, duration, base_url_override, endpoints, auto_update, force_new, no_snapshot
   - `generate_scenario_jmx`: scenario_path, spec_path, output_path, base_url_override, **auto-filename**
   - `validate_jmx`: jmx_path - validates JMX structure with recommendations
   - `visualize_scenario`: scenario_path, spec_path - returns JSON, text, and Mermaid diagram
@@ -191,10 +191,10 @@ Output (formatted response)
   - `jmeter-gen new scenario` command
   - Auto-detect OpenAPI spec, smart capture suggestions
   - Loop and think time support
-- **Overall**: 677 tests passing, 82% code coverage
+- **Overall**: 691 tests passing, 82% code coverage
 - Project structure and configuration (pyproject.toml)
 - Package initialization files
-- Comprehensive documentation (8 docs)
+- Comprehensive documentation (23 docs in docs/)
 - VS Code configuration with MCP setup
 
 ### Implementation Order (Step-by-Step)

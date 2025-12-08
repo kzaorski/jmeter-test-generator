@@ -13,7 +13,7 @@ pip install -e .
 
 ```bash
 jmeter-gen --version
-# Output: jmeter-gen, version 3.0.0
+# Output: jmeter-gen, version 3.2.2
 ```
 
 ## Basic Usage
@@ -103,7 +103,7 @@ Default values (for single-run testing):
 ### 4. Validate Generated JMX
 
 ```bash
-jmeter-gen validate performance-test.jmx
+jmeter-gen validate script performance-test.jmx
 ```
 
 Expected output:
@@ -146,7 +146,7 @@ jmeter-gen generate \
   --output api-load-test.jmx
 
 # Validate
-jmeter-gen validate api-load-test.jmx
+jmeter-gen validate script api-load-test.jmx
 
 # Run in JMeter
 jmeter -n -t api-load-test.jmx -l results.jtl
@@ -319,8 +319,11 @@ jmeter-gen new scenario [OPTIONS]
   --spec PATH           Path to OpenAPI spec (auto-detected if not provided)
   --output, -o NAME     Output filename (default: pt_scenario.yaml)
 
-# Validate JMX
-jmeter-gen validate JMX_PATH
+# Validate JMX script
+jmeter-gen validate script JMX_PATH
+
+# Validate scenario file
+jmeter-gen validate scenario SCENARIO_PATH [--spec OPENAPI_PATH]
 
 # Start MCP Server
 jmeter-gen mcp
