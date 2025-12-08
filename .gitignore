@@ -83,3 +83,8 @@ Thumbs.db
 
 # JMeter Gen runtime directory
 .jmeter-gen/
+
+# Nuitka build artifacts
+*.build/
+*.dist/
+*.onefile-build/
