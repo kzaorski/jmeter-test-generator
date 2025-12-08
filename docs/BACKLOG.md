@@ -26,8 +26,7 @@ Prioritized list of planned extensions for JMeter Test Generator.
 
 | Extension | Description |
 |-----------|-------------|
-| Global Authorization | Auto-apply captured token (Bearer) to all subsequent requests |
-| More assertion types | JSON assertions, regex, response time |
+| Conditional Execution | if/else conditions for scenario steps |
 
 ---
 
@@ -35,9 +34,10 @@ Prioritized list of planned extensions for JMeter Test Generator.
 
 | Extension | Description |
 |-----------|-------------|
+| Global Authorization | Auto-apply captured token (Bearer) to all subsequent requests |
+| More assertion types | JSON assertions, regex, response time |
 | CSV Data Set Config | Data-driven testing with CSV files |
 | Foreach Loop | Iterate over captured array variables (petIds_1, petIds_2, etc.) |
-| Conditional Execution | if/else conditions for scenario steps |
 | Bearer token support | Authorization header with Bearer tokens |
 | Basic auth | HTTP Basic authentication |
 | API key in headers | Custom API key headers |
