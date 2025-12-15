@@ -71,11 +71,13 @@ class AssertConfig:
         status: Expected HTTP status code (optional)
         body: Dictionary of field -> expected value assertions
         headers: Dictionary of header -> expected value assertions
+        body_contains: List of substrings that must be present in response body
     """
 
     status: Optional[int] = None
     body: dict[str, Any] = field(default_factory=dict)
     headers: dict[str, str] = field(default_factory=dict)
+    body_contains: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
@@ -83,6 +85,7 @@ class AssertConfig:
             "status": self.status,
             "body": self.body,
             "headers": self.headers,
+            "body_contains": self.body_contains,
         }
 
 

@@ -886,27 +886,18 @@ class JMXGenerator:
         """Create Response Assertions for an endpoint.
 
         Creates assertions to validate response codes based on OpenAPI spec.
-        If spec defines response codes, uses those. Otherwise falls back to:
-        - POST requests: Expect 201 (Created)
-        - Other requests: Expect 200 (OK)
+        Only adds assertions for explicitly defined 2xx response codes.
+        If spec has no 2xx codes, no assertions are added.
 
         Args:
             endpoint: Endpoint dictionary with expected_response_codes key
 
         Returns:
-            List of ResponseAssertion XML Elements
+            List of ResponseAssertion XML Elements (empty if no codes defined)
         """
         # Get expected response codes from endpoint data (extracted from spec)
+        # No fallback - only use explicitly defined codes from OpenAPI spec
         expected_codes = endpoint.get("expected_response_codes", [])
-
-        # Fallback to hardcoded logic if no codes in endpoint data
-        # (for backward compatibility with older parser versions)
-        if not expected_codes:
-            method = endpoint.get("method", "GET")
-            if method == "POST":
-                expected_codes = ["201"]
-            else:
-                expected_codes = ["200"]
 
         assertions = []
 

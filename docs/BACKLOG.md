@@ -27,7 +27,7 @@ Prioritized list of planned extensions for JMeter Test Generator.
 | Extension | Description |
 |-----------|-------------|
 | Conditional Execution | if/else conditions for scenario steps |
-| Collection Import | Import Postman/Insomnia/Bruno collections to pt_scenario.yaml |
+| TestAction | Flow control: pause, stop, go to next iteration |
 
 ---
 

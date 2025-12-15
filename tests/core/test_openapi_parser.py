@@ -376,10 +376,13 @@ paths:
         assert "expected_response_codes" in post_endpoint
         assert set(post_endpoint["expected_response_codes"]) == {"200", "201"}
 
-    def test_parse_endpoints_fallback_response_codes(
+    def test_parse_endpoints_no_response_codes_when_not_defined(
         self, parser: OpenAPIParser, temp_project_dir: Path
     ):
-        """Test fallback to default response codes when spec has no responses."""
+        """Test that expected_response_codes is empty when spec has no responses.
+
+        We don't assume 200/201 - only use explicitly defined response codes.
+        """
         spec = {
             "openapi": "3.0.0",
             "info": {"title": "Test API", "version": "1.0.0"},
@@ -402,13 +405,12 @@ paths:
 
         result = parser.parse(str(spec_path))
 
-        # GET should default to 200
+        # No fallback - expected_response_codes should be empty
         get_endpoint = [ep for ep in result["endpoints"] if ep["method"] == "GET"][0]
-        assert get_endpoint["expected_response_codes"] == ["200"]
+        assert get_endpoint["expected_response_codes"] == []
 
-        # POST should default to 201
         post_endpoint = [ep for ep in result["endpoints"] if ep["method"] == "POST"][0]
-        assert post_endpoint["expected_response_codes"] == ["201"]
+        assert post_endpoint["expected_response_codes"] == []
 
     def test_parse_endpoints_ignores_non_success_codes(
         self, parser: OpenAPIParser, temp_project_dir: Path

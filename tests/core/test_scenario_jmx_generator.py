@@ -1422,3 +1422,224 @@ paths:
 
         # correlationId field should be substituted with ${correlationId}
         assert "${correlationId}" in content
+
+    def test_generate_with_body_contains_assertion(self, generator, tmp_path):
+        """Test that ResponseAssertion is generated for body_contains."""
+        scenario = ParsedScenario(
+            name="Body Contains Test",
+            description=None,
+            settings=ScenarioSettings(base_url="http://localhost:8000"),
+            variables={},
+            steps=[
+                ScenarioStep(
+                    name="Get HTML Page",
+                    endpoint="GET /page",
+                    endpoint_type="method_path",
+                    method="GET",
+                    path="/page",
+                    assertions=AssertConfig(
+                        status=200,
+                        body_contains=["Success", "completed"],
+                    ),
+                )
+            ],
+        )
+
+        output_path = tmp_path / "body_contains.jmx"
+
+        result = generator.generate(
+            scenario=scenario,
+            output_path=str(output_path),
+        )
+
+        assert result["success"] is True
+        assert result["assertions_created"] >= 2  # status + body_contains
+
+        tree = ET.parse(output_path)
+        root = tree.getroot()
+
+        # Should have ResponseAssertion for body_contains
+        response_assertions = root.findall(".//ResponseAssertion")
+        assert len(response_assertions) >= 2  # status + body_contains
+
+        # Find the body contains assertion
+        body_contains_assertion = None
+        for assertion in response_assertions:
+            test_field = assertion.find(".//stringProp[@name='Assertion.test_field']")
+            if test_field is not None and test_field.text == "Assertion.response_data":
+                body_contains_assertion = assertion
+                break
+
+        assert body_contains_assertion is not None, "Body contains assertion not found"
+
+        # Verify test_type is 16 (Substring)
+        test_type = body_contains_assertion.find(".//intProp[@name='Assertion.test_type']")
+        assert test_type is not None
+        assert test_type.text == "16"
+
+        # Verify test strings are present
+        coll_prop = body_contains_assertion.find(".//collectionProp[@name='Asserion.test_strings']")
+        assert coll_prop is not None
+        string_props = coll_prop.findall("stringProp")
+        texts = [sp.text for sp in string_props]
+        assert "Success" in texts
+        assert "completed" in texts
+
+    def test_generate_with_single_body_contains(self, generator, tmp_path):
+        """Test body_contains with a single string value."""
+        scenario = ParsedScenario(
+            name="Single Body Contains Test",
+            description=None,
+            settings=ScenarioSettings(base_url="http://localhost:8000"),
+            variables={},
+            steps=[
+                ScenarioStep(
+                    name="Get Page",
+                    endpoint="GET /page",
+                    endpoint_type="method_path",
+                    method="GET",
+                    path="/page",
+                    assertions=AssertConfig(
+                        body_contains=["OK"],  # Single element list
+                    ),
+                )
+            ],
+        )
+
+        output_path = tmp_path / "single_body_contains.jmx"
+
+        result = generator.generate(
+            scenario=scenario,
+            output_path=str(output_path),
+        )
+
+        assert result["success"] is True
+
+        tree = ET.parse(output_path)
+        root = tree.getroot()
+
+        # Find body contains assertion
+        response_assertions = root.findall(".//ResponseAssertion")
+        body_contains_assertion = None
+        for assertion in response_assertions:
+            test_field = assertion.find(".//stringProp[@name='Assertion.test_field']")
+            if test_field is not None and test_field.text == "Assertion.response_data":
+                body_contains_assertion = assertion
+                break
+
+        assert body_contains_assertion is not None
+
+    def test_generate_standalone_think_time(self, generator, tmp_path):
+        """Test that ConstantTimer is generated for standalone think_time step."""
+        scenario = ParsedScenario(
+            name="Think Time Test",
+            description=None,
+            settings=ScenarioSettings(base_url="http://localhost:8000"),
+            variables={},
+            steps=[
+                ScenarioStep(
+                    name="Get Data",
+                    endpoint="GET /data",
+                    endpoint_type="method_path",
+                    method="GET",
+                    path="/data",
+                ),
+                ScenarioStep(
+                    name="Wait",
+                    endpoint="think_time",
+                    endpoint_type="think_time",
+                    think_time=5000,
+                ),
+                ScenarioStep(
+                    name="Get More Data",
+                    endpoint="GET /more",
+                    endpoint_type="method_path",
+                    method="GET",
+                    path="/more",
+                ),
+            ],
+        )
+
+        output_path = tmp_path / "think_time.jmx"
+
+        result = generator.generate(
+            scenario=scenario,
+            output_path=str(output_path),
+        )
+
+        assert result["success"] is True
+
+        tree = ET.parse(output_path)
+        root = tree.getroot()
+
+        # Should have ConstantTimer
+        timers = root.findall(".//ConstantTimer")
+        assert len(timers) >= 1, "ConstantTimer not found"
+
+        # Verify timer delay
+        timer = timers[0]
+        delay_prop = timer.find(".//stringProp[@name='ConstantTimer.delay']")
+        assert delay_prop is not None
+        assert delay_prop.text == "5000"
+
+        # Verify timer name
+        assert timer.get("testname") == "Wait"
+
+    def test_generate_think_time_in_nested_loop(self, generator, tmp_path):
+        """Test that ConstantTimer is generated for think_time in nested loop."""
+        scenario = ParsedScenario(
+            name="Nested Think Time Test",
+            description=None,
+            settings=ScenarioSettings(base_url="http://localhost:8000"),
+            variables={},
+            steps=[
+                ScenarioStep(
+                    name="Poll Loop",
+                    endpoint="loop_block",
+                    endpoint_type="loop_block",
+                    loop=LoopConfig(count=3),
+                    nested_steps=[
+                        ScenarioStep(
+                            name="Check Status",
+                            endpoint="GET /status",
+                            endpoint_type="method_path",
+                            method="GET",
+                            path="/status",
+                        ),
+                        ScenarioStep(
+                            name="Wait Between Polls",
+                            endpoint="think_time",
+                            endpoint_type="think_time",
+                            think_time=2000,
+                        ),
+                    ],
+                ),
+            ],
+        )
+
+        output_path = tmp_path / "nested_think_time.jmx"
+
+        result = generator.generate(
+            scenario=scenario,
+            output_path=str(output_path),
+        )
+
+        assert result["success"] is True
+
+        tree = ET.parse(output_path)
+        root = tree.getroot()
+
+        # Should have ConstantTimer for the nested think_time
+        timers = root.findall(".//ConstantTimer")
+        assert len(timers) >= 1, "ConstantTimer not found in nested loop"
+
+        # Find the timer with our specific delay
+        found_timer = False
+        for timer in timers:
+            delay_prop = timer.find(".//stringProp[@name='ConstantTimer.delay']")
+            if delay_prop is not None and delay_prop.text == "2000":
+                found_timer = True
+                assert timer.get("testname") == "Wait Between Polls"
+                break
+
+        assert found_timer, "ConstantTimer with 2000ms delay not found"

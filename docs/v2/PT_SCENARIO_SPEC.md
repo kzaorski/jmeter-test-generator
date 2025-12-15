@@ -271,6 +271,35 @@ capture:
   - userId: "userIds"         # In loop context, stores as userIds_1, userIds_2, etc.
 ```
 
+### Auto-Capture for While Loops
+
+When using a `while` loop condition, the variable referenced in the condition
+is **automatically captured** if not explicitly listed in `capture`. This enables
+the while condition to evaluate correctly on each iteration.
+
+```yaml
+- name: "Poll Status"
+  endpoint: "GET /status"
+  loop:
+    while: "$.status != 'completed'"  # 'status' is auto-captured
+  # No explicit capture needed for 'status' - it's auto-extracted
+```
+
+The generator automatically creates a JSONPostProcessor to extract the
+variable used in the condition (e.g., `status` from `$.status != 'completed'`).
+
+If you explicitly capture the same variable, the explicit capture takes precedence
+and no duplicate extractor is created:
+
+```yaml
+- name: "Poll Status"
+  endpoint: "GET /status"
+  loop:
+    while: "$.status != 'completed'"
+  capture:
+    - status  # Explicit capture - auto-capture is skipped
+```
+
 ---
 
 ## Assert Syntax
@@ -301,6 +330,23 @@ assert:
   status: 200
   headers:
     Content-Type: "application/json"
+```
+
+### Body Contains Assertions (non-JSON)
+
+For non-JSON responses (plain text, HTML, XML, etc.):
+
+```yaml
+assert:
+  status: 200
+  body_contains: "Success"           # Single substring
+
+# Or multiple substrings (all must be present):
+assert:
+  status: 200
+  body_contains:
+    - "Success"
+    - "completed"
 ```
 
 ---
@@ -371,6 +417,9 @@ Repeat until a condition is met:
 The while loop continues until the condition evaluates to false or max_iterations is reached.
 The condition uses JSONPath syntax to check values from the response.
 
+**Note**: If `while` is set to an empty string, it defaults to `"$.status != 'done'"` as a fallback.
+Always provide a meaningful condition for predictable behavior.
+
 ### Multi-Step Loop
 
 Wrap multiple steps in a loop block:
@@ -402,6 +451,29 @@ The `steps` array can contain any valid step type:
 - Regular endpoint calls
 - Think time delays (`think_time: ms`)
 - Captures and assertions
+
+### Loop Block Names
+
+If `name` is not specified for a multi-step loop block, it defaults to:
+- Fixed count loops: `"Loop {count}x"` (e.g., "Loop 5x")
+- While loops: `"While Loop"`
+
+```yaml
+# This loop block will be named "Loop 3x"
+- loop:
+    count: 3
+  steps:
+    - name: "Step A"
+      endpoint: "GET /a"
+
+# Override with custom name
+- name: "Custom Loop Name"
+  loop:
+    count: 3
+  steps:
+    - name: "Step A"
+      endpoint: "GET /a"
+```
 
 ### Multi-Step While Loop
 
@@ -481,6 +553,33 @@ Think time is specified in milliseconds and generates a JMeter ConstantTimer ele
 ### Error Handling
 - Missing capture field: Warning + placeholder (test continues)
 - Undefined variable in substitution: Warning + keep literal `${varName}`
+
+### Payload Auto-Generation
+
+When a step has no explicit `payload` but the OpenAPI specification defines
+a request body schema for the endpoint, the generator:
+
+1. Auto-generates a sample payload from the OpenAPI schema (same as v1 behavior)
+2. Substitutes captured variables where field names match
+
+**Example**: If step 1 captures `userId`, and step 2's auto-generated payload
+has a `userId` field, it automatically becomes `"userId": "${userId}"`.
+
+```yaml
+scenario:
+  - name: "Create User"
+    endpoint: "createUser"
+    capture:
+      - userId    # Captured from response
+
+  - name: "Create Order"
+    endpoint: "createOrder"
+    # No payload specified - auto-generated from OpenAPI schema
+    # If schema has 'userId' field, it's auto-populated with ${userId}
+```
+
+This enables seamless variable correlation between steps without manual
+payload definition when the OpenAPI spec provides complete request schemas.
 
 ---
 
@@ -583,6 +682,16 @@ The parser validates the following:
 3. **Variable definitions**: Variables must be defined before use (in `variables` or `capture`)
 4. **Type consistency**: `params` and `payload` types should match OpenAPI schema (warning only)
 
+### Field Validation Constraints
+
+| Field | Constraint |
+|-------|------------|
+| `loop.count` | Positive integer >= 1 |
+| `loop.while` | Non-empty string (empty string defaults to `"$.status != 'done'"`) |
+| `loop.max` | Positive integer >= 1 (default: 100) |
+| `loop.interval` | Non-negative integer >= 0 (milliseconds) |
+| `think_time` | Non-negative integer >= 0 (milliseconds) |
+
 ### Error vs Warning Distinction
 
 **Errors (blocking)** - Prevents JMX generation:
@@ -634,3 +743,19 @@ Recommended file names:
 - `pt_scenario.yaml` - default name (auto-discovered)
 - `{name}_scenario.yaml` - named scenarios
 - `scenarios/*.yaml` - multiple scenarios in folder
+
+---
+
+## Important Notes
+
+### Spec Binding Requirement
+
+Every scenario file must be used together with an OpenAPI specification:
+- `generate_scenario_jmx` requires both `scenario_path` and `spec_path`
+- `validate_scenario` validates endpoints against the spec
+- Endpoints in scenario must exist in the OpenAPI spec
+
+This is intentional - scenarios describe test flows for a specific API. The spec provides:
+- Endpoint validation (ensures you're testing real endpoints)
+- Response schema for JSONPath auto-detection in captures
+- Base URL fallback if not specified in scenario settings

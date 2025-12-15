@@ -56,8 +56,10 @@ async def list_tools() -> List[Tool]:
             name="analyze_project_for_jmeter",
             description=(
                 "Use this tool FIRST when user wants JMeter tests for an API project. "
-                "Discovers OpenAPI/Swagger specs in the current directory (default) or specified path. "
-                "Returns spec location, API title, endpoint count, and recommended actions."
+                "Discovers OpenAPI/Swagger specs and pt_scenario.yaml files. "
+                "Returns spec location, API title, endpoint count, and recommended next tool. "
+                "TWO generation paths: (1) generate_jmx_from_openapi for simple parallel tests, "
+                "(2) generate_scenario_jmx for sequential flows with variable correlation."
             ),
             inputSchema={
                 "type": "object",
@@ -84,10 +86,11 @@ async def list_tools() -> List[Tool]:
             name="generate_jmx_from_openapi",
             description=(
                 "Generate a JMeter JMX test plan from an OpenAPI specification. "
-                "Parses the OpenAPI spec, creates HTTP samplers for each endpoint, "
-                "configures thread groups with load parameters, and validates the output. "
-                "Supports both OpenAPI 3.0.x and Swagger 2.0 formats. "
-                "Supports auto_update to update existing JMX when spec changes."
+                "Creates HTTP samplers for ALL endpoints running in PARALLEL (simple load test). "
+                "Use this for basic API load testing without sequential dependencies. "
+                "For SEQUENTIAL test flows with variable passing between steps, "
+                "use generate_scenario_jmx with a pt_scenario.yaml file instead. "
+                "Supports OpenAPI 3.0.x and Swagger 2.0. Supports auto_update for spec changes."
             ),
             inputSchema={
                 "type": "object",
@@ -150,10 +153,12 @@ async def list_tools() -> List[Tool]:
         Tool(
             name="generate_scenario_jmx",
             description=(
-                "Generate a JMeter JMX test plan from a pt_scenario.yaml file (v2). "
-                "Creates sequential HTTP samplers with JSONPostProcessor elements "
-                "for variable extraction and correlation. Automatically detects "
-                "JSONPath expressions from OpenAPI response schemas."
+                "Generate a JMeter JMX test plan from a pt_scenario.yaml file. "
+                "Use this instead of generate_jmx_from_openapi when you need SEQUENTIAL test flows "
+                "with variable passing between steps (e.g., create user -> get user by captured ID). "
+                "Creates sequential HTTP samplers with JSONPostProcessor for variable extraction. "
+                "Workflow: list_endpoints -> suggest_captures -> build_scenario -> validate_scenario -> generate_scenario_jmx. "
+                "The pt_scenario.yaml file can be created using the build_scenario tool."
             ),
             inputSchema={
                 "type": "object",
@@ -225,10 +230,10 @@ async def list_tools() -> List[Tool]:
         Tool(
             name="list_endpoints",
             description=(
-                "Use this tool FIRST when user wants to create a JMeter test scenario. "
+                "Use this tool FIRST when user wants to create a SCENARIO-BASED JMeter test. "
                 "Lists all available API endpoints from an OpenAPI/Swagger spec. "
-                "Essential for understanding what endpoints are available before "
-                "building a test scenario. Returns method, path, operationId, and summary."
+                "Returns method, path, operationId, and summary for each endpoint. "
+                "Next step: use suggest_captures to find variables to capture, then build_scenario to create pt_scenario.yaml."
             ),
             inputSchema={
                 "type": "object",
@@ -247,8 +252,8 @@ async def list_tools() -> List[Tool]:
                 "Use this tool to find variables to capture from API responses "
                 "(e.g., IDs, tokens, status fields for polling). "
                 "Analyzes endpoint response schema and suggests JSONPath expressions. "
-                "Essential for scenarios that need to pass data between steps or "
-                "poll until a condition is met (e.g., status == 'completed')."
+                "Use these suggestions in the 'capture' field when calling build_scenario. "
+                "Essential for scenarios that pass data between steps (e.g., userId from step 1 used in step 2)."
             ),
             inputSchema={
                 "type": "object",
@@ -268,12 +273,12 @@ async def list_tools() -> List[Tool]:
         Tool(
             name="build_scenario",
             description=(
-                "Use this tool when the user describes a test scenario in natural language, "
-                "such as 'call /trigger then poll /status until completed' or "
-                "'create user, then get user details'. "
-                "Builds a pt_scenario.yaml file with sequential steps, variable capture, "
-                "and loop/polling support (e.g., while: '$.status != completed'). "
-                "Supports both operationId and 'METHOD /path' endpoint formats."
+                "Use this tool to create a pt_scenario.yaml file for scenario-based JMX generation. "
+                "Describe test scenarios like 'create user, then get user by ID' or 'trigger job, poll until completed'. "
+                "Creates sequential steps with variable capture and loop/polling support. "
+                "WORKFLOW: After building, call validate_scenario to check for errors, "
+                "then generate_scenario_jmx to create the JMX file. "
+                "Supports operationId ('createUser') and 'METHOD /path' ('POST /users') formats."
             ),
             inputSchema={
                 "type": "object",

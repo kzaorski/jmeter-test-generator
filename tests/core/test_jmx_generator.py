@@ -39,7 +39,8 @@ class TestJMXGenerator:
                     "operationId": "getUsers",
                     "summary": "Get all users",
                     "requestBody": False,
-                    "parameters": []
+                    "parameters": [],
+                    "expected_response_codes": ["200"]
                 },
                 {
                     "path": "/api/users",
@@ -47,7 +48,8 @@ class TestJMXGenerator:
                     "operationId": "createUser",
                     "summary": "Create a new user",
                     "requestBody": True,
-                    "parameters": []
+                    "parameters": [],
+                    "expected_response_codes": ["201"]
                 },
                 {
                     "path": "/api/users/{id}",
@@ -55,7 +57,8 @@ class TestJMXGenerator:
                     "operationId": "updateUser",
                     "summary": "Update user",
                     "requestBody": True,
-                    "parameters": [{"name": "id", "in": "path"}]
+                    "parameters": [{"name": "id", "in": "path"}],
+                    "expected_response_codes": ["200"]
                 },
                 {
                     "path": "/api/users/{id}",
@@ -63,7 +66,8 @@ class TestJMXGenerator:
                     "operationId": "deleteUser",
                     "summary": "Delete user",
                     "requestBody": False,
-                    "parameters": [{"name": "id", "in": "path"}]
+                    "parameters": [{"name": "id", "in": "path"}],
+                    "expected_response_codes": ["204"]
                 }
             ],
             "spec": {}
@@ -87,7 +91,8 @@ class TestJMXGenerator:
                     "operationId": "healthCheck",
                     "summary": "",
                     "requestBody": False,
-                    "parameters": []
+                    "parameters": [],
+                    "expected_response_codes": ["200"]
                 }
             ],
             "spec": {}
@@ -520,11 +525,12 @@ class TestJMXGenerator:
         assert "postserviceagenttestcases" not in testname
 
     def test_create_assertions_for_post(self, generator: JMXGenerator) -> None:
-        """Test Response Assertion creation for POST request (expects 201)."""
+        """Test Response Assertion creation for POST request with explicit 201."""
         endpoint = {
             "path": "/api/users",
             "method": "POST",
-            "operationId": "createUser"
+            "operationId": "createUser",
+            "expected_response_codes": ["201"]
         }
 
         assertions = generator._create_assertions(endpoint)
@@ -555,11 +561,12 @@ class TestJMXGenerator:
         assert string_props[0].text == "201"
 
     def test_create_assertions_for_get(self, generator: JMXGenerator) -> None:
-        """Test Response Assertion creation for GET request (expects 200)."""
+        """Test Response Assertion creation for GET request with explicit code."""
         endpoint = {
             "path": "/api/users",
             "method": "GET",
-            "operationId": "getUsers"
+            "operationId": "getUsers",
+            "expected_response_codes": ["200"]
         }
 
         assertions = generator._create_assertions(endpoint)
@@ -575,11 +582,12 @@ class TestJMXGenerator:
         assert string_props[0].text == "200"
 
     def test_create_assertions_for_put(self, generator: JMXGenerator) -> None:
-        """Test Response Assertion creation for PUT request (expects 200)."""
+        """Test Response Assertion creation for PUT request with explicit code."""
         endpoint = {
             "path": "/api/users/{id}",
             "method": "PUT",
-            "operationId": "updateUser"
+            "operationId": "updateUser",
+            "expected_response_codes": ["200"]
         }
 
         assertions = generator._create_assertions(endpoint)
@@ -590,11 +598,12 @@ class TestJMXGenerator:
         assert string_props[0].text == "200"
 
     def test_create_assertions_for_delete(self, generator: JMXGenerator) -> None:
-        """Test Response Assertion creation for DELETE request (expects 200)."""
+        """Test Response Assertion creation for DELETE request with explicit code."""
         endpoint = {
             "path": "/api/users/{id}",
             "method": "DELETE",
-            "operationId": "deleteUser"
+            "operationId": "deleteUser",
+            "expected_response_codes": ["204"]
         }
 
         assertions = generator._create_assertions(endpoint)
@@ -602,7 +611,7 @@ class TestJMXGenerator:
 
         test_strings = assertion.find("collectionProp[@name='Asserion.test_strings']")
         string_props = test_strings.findall("stringProp")
-        assert string_props[0].text == "200"
+        assert string_props[0].text == "204"
 
     def test_create_assertions_with_spec_defined_code(self, generator: JMXGenerator) -> None:
         """Test Response Assertion creation using spec-defined response code."""
@@ -649,9 +658,12 @@ class TestJMXGenerator:
 
         assert set(codes) == {"200", "201"}
 
-    def test_create_assertions_fallback_for_missing_codes(self, generator: JMXGenerator) -> None:
-        """Test fallback to default codes when expected_response_codes is missing."""
-        # POST without expected_response_codes should default to 201
+    def test_no_assertions_when_no_response_codes_defined(self, generator: JMXGenerator) -> None:
+        """Test that no assertions are created when expected_response_codes is missing.
+
+        This is intentional - we don't assume 200/201, only use explicitly defined codes.
+        """
+        # POST without expected_response_codes - no assertions
         post_endpoint = {
             "path": "/api/users",
             "method": "POST",
@@ -660,10 +672,9 @@ class TestJMXGenerator:
         }
 
         post_assertions = generator._create_assertions(post_endpoint)
-        assert len(post_assertions) == 1
-        assert post_assertions[0].get("testname") == "Response Code 201"
+        assert len(post_assertions) == 0
 
-        # GET without expected_response_codes should default to 200
+        # GET without expected_response_codes - no assertions
         get_endpoint = {
             "path": "/api/users",
             "method": "GET",
@@ -672,8 +683,7 @@ class TestJMXGenerator:
         }
 
         get_assertions = generator._create_assertions(get_endpoint)
-        assert len(get_assertions) == 1
-        assert get_assertions[0].get("testname") == "Response Code 200"
+        assert len(get_assertions) == 0
 
     def test_generate_success(
         self,
@@ -1123,6 +1133,7 @@ class TestRequestBodySupport:
                         "properties": {"name": {"type": "string"}},
                     },
                     "parameters": [],
+                    "expected_response_codes": ["201"],
                 }
             ],
         }
@@ -1171,6 +1182,7 @@ class TestRequestBodySupport:
                     "content_type": None,
                     "request_body_schema": None,
                     "parameters": [],
+                    "expected_response_codes": ["200"],
                 }
             ],
         }

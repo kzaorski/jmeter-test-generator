@@ -137,7 +137,7 @@ class TestAssertConfig:
         """Test conversion to dictionary."""
         assertion = AssertConfig(status=200, body={"id": 1})
         result = assertion.to_dict()
-        assert result == {"status": 200, "body": {"id": 1}, "headers": {}}
+        assert result == {"status": 200, "body": {"id": 1}, "headers": {}, "body_contains": []}
 
 
 class TestScenarioStep:

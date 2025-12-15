@@ -525,12 +525,8 @@ class OpenAPIParser:
                         # Skip "default" or other non-numeric codes
                         continue
 
-                # If no success codes found, default to method-based assumption
-                if not expected_response_codes:
-                    if method.upper() == "POST":
-                        expected_response_codes = ["201"]
-                    else:
-                        expected_response_codes = ["200"]
+                # Note: If no 2xx codes found, expected_response_codes stays empty
+                # (no fallback to 200/201 - assertions only for explicitly defined codes)
 
                 # Create endpoint dict (using full_path which includes path_prefix)
                 endpoint = {

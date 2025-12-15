@@ -525,6 +525,12 @@ All v2 specifications are in `docs/v2/`:
    - `generate_text_visualization()` - ASCII text visualization
    - Used by MCP `visualize_scenario` tool
 
+### v2 Design Decisions
+- **Scenario-Spec Binding**: Every pt_scenario.yaml MUST be linked to an OpenAPI spec.
+  You cannot use endpoints that don't exist in the specification. This is enforced by
+  `validate_scenario` and `generate_scenario_jmx` (both require `spec_path` parameter).
+  Rationale: ensures test scenarios match actual API, enables JSONPath auto-detection.
+
 ### v2 Test Fixtures
 Test fixtures for scenario parser in `tests/fixtures/scenarios/`:
 - `valid_basic.yaml` - Minimal valid scenario

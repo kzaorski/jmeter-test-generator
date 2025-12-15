@@ -397,10 +397,16 @@ class PtScenarioParser:
         if not assert_data:
             return None
 
+        # Handle body_contains - can be string or list
+        body_contains = assert_data.get("body_contains", [])
+        if isinstance(body_contains, str):
+            body_contains = [body_contains]
+
         return AssertConfig(
             status=assert_data.get("status"),
             body=assert_data.get("body", {}),
             headers=assert_data.get("headers", {}),
+            body_contains=body_contains,
         )
 
     def _parse_loop(
