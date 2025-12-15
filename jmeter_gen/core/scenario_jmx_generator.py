@@ -736,6 +736,40 @@ class ScenarioJMXGenerator:
             ).text = "false"
             elements.append(assertion)
 
+        # Body contains assertions (substring matching for non-JSON responses)
+        if assertions.body_contains:
+            assertion = ET.Element(
+                "ResponseAssertion",
+                {
+                    "guiclass": "AssertionGui",
+                    "testclass": "ResponseAssertion",
+                    "testname": "Body Contains Assertion",
+                    "enabled": "true",
+                },
+            )
+            ET.SubElement(
+                assertion,
+                "stringProp",
+                {"name": "Assertion.test_field"},
+            ).text = "Assertion.response_data"
+            ET.SubElement(
+                assertion,
+                "intProp",
+                {"name": "Assertion.test_type"},
+            ).text = "16"  # Substring
+            coll_prop = ET.SubElement(
+                assertion,
+                "collectionProp",
+                {"name": "Asserion.test_strings"},  # JMeter typo preserved
+            )
+            for text in assertions.body_contains:
+                ET.SubElement(
+                    coll_prop,
+                    "stringProp",
+                    {"name": str(hash(text))},
+                ).text = text
+            elements.append(assertion)
+
         return elements
 
     def _substitute_path_params(self, path: str, params: dict[str, Any]) -> str:
@@ -748,7 +782,8 @@ class ScenarioJMXGenerator:
 
     def _convert_path_params(self, path: str) -> str:
         """Convert {param} to ${param} for JMeter."""
-        return re.sub(r"\{([^}]+)\}", r"${\1}", path)
+        # Use negative lookbehind to skip already-converted ${...} patterns
+        return re.sub(r"(?<!\$)\{([^}]+)\}", r"${\1}", path)
 
     def _create_query_params_element(self, params: dict[str, Any]) -> ET.Element:
         """Create query parameters element."""
