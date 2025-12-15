@@ -79,7 +79,6 @@ def build(onefile: bool = False):
         "--standalone" if not onefile else "--onefile",
         # Include packages
         "--include-package=jmeter_gen.core",
-        "--include-package=jmeter_gen.core.importers",
         # Required dependencies
         "--include-package=click",
         "--include-package=rich",

@@ -179,7 +179,6 @@ P2 Extensions
     v
 P3 Extensions
     |
-    +-- Import tools (standalone)
     +-- Data generation (requires: Parser)
     +-- Advanced features
 ```

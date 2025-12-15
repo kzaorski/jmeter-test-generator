@@ -61,7 +61,7 @@ Repository = "https://github.com/kzaorski/jmeter-test-generator"
 Issues = "https://github.com/kzaorski/jmeter-test-generator/issues"
 
 [tool.setuptools]
-packages = ["jmeter_gen", "jmeter_gen.core", "jmeter_gen.core.importers"]
+packages = ["jmeter_gen", "jmeter_gen.core"]
 
 [tool.setuptools.package-data]
 jmeter_gen = ["templates/*.xml"]
