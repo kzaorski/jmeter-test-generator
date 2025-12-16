@@ -19,6 +19,7 @@ from jmeter_gen.exceptions import (
 from jmeter_gen.core.scenario_data import (
     AssertConfig,
     CaptureConfig,
+    FileConfig,
     LoopConfig,
     ParsedScenario,
     ScenarioSettings,
@@ -279,6 +280,17 @@ class PtScenarioParser:
             # Parse loop configuration (single-step loop)
             loop_config = self._parse_loop(step_data.get("loop"), i, scenario_path)
 
+            # Parse files
+            files = self._parse_files(step_data.get("files", []))
+
+            # Parse think_time if present on endpoint step
+            think_time = step_data.get("think_time")
+            if think_time is not None:
+                if not isinstance(think_time, int) or think_time < 0:
+                    raise ScenarioValidationException(
+                        f"Invalid think_time in step {i}: must be non-negative integer"
+                    )
+
             step = ScenarioStep(
                 name=str(step_data["name"]),
                 endpoint=endpoint,
@@ -289,9 +301,11 @@ class PtScenarioParser:
                 params=step_data.get("params", {}),
                 headers=step_data.get("headers", {}),
                 payload=step_data.get("payload"),
+                files=files,
                 captures=captures,
                 assertions=assertions,
                 loop=loop_config,
+                think_time=think_time,
             )
             steps.append(step)
 
@@ -496,6 +510,48 @@ class PtScenarioParser:
             max_iterations=max_iterations,
             interval=interval,
         )
+
+    def _parse_files(self, files_data: Any) -> list[FileConfig]:
+        """Parse file upload configuration.
+
+        Expected format:
+        files:
+          - path: "path/to/file.pdf"
+            param: "file"
+            mime_type: "application/pdf"  # optional
+
+        Args:
+            files_data: List of file dictionaries from YAML
+
+        Returns:
+            List of FileConfig objects
+        """
+        if not files_data:
+            return []
+
+        if not isinstance(files_data, list):
+            files_data = [files_data]
+
+        files = []
+        for item in files_data:
+            if not isinstance(item, dict):
+                continue
+
+            path = item.get("path")
+            param = item.get("param")
+
+            if not path or not param:
+                continue
+
+            files.append(
+                FileConfig(
+                    path=str(path),
+                    param=str(param),
+                    mime_type=item.get("mime_type"),
+                )
+            )
+
+        return files
 
     def _find_variable_references(self, step: ScenarioStep) -> set[str]:
         """Find all variable references in a step.

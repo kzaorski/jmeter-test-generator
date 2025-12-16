@@ -90,6 +90,29 @@ class AssertConfig:
 
 
 @dataclass
+class FileConfig:
+    """Configuration for file upload.
+
+    Attributes:
+        path: Path to the file to upload
+        param: Form field parameter name
+        mime_type: MIME type of the file (optional, auto-detected if not specified)
+    """
+
+    path: str
+    param: str
+    mime_type: Optional[str] = None
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        return {
+            "path": self.path,
+            "param": self.param,
+            "mime_type": self.mime_type,
+        }
+
+
+@dataclass
 class LoopConfig:
     """Configuration for step-level looping.
 
@@ -133,6 +156,7 @@ class ScenarioStep:
         params: Path and query parameters
         headers: Additional HTTP headers
         payload: Request body (JSON)
+        files: List of files to upload
         captures: List of variables to capture from response
         assertions: Response assertions
         loop: Loop configuration for repeating this step
@@ -149,6 +173,7 @@ class ScenarioStep:
     params: dict[str, Any] = field(default_factory=dict)
     headers: dict[str, str] = field(default_factory=dict)
     payload: Optional[dict[str, Any]] = None
+    files: list[FileConfig] = field(default_factory=list)
     captures: list[CaptureConfig] = field(default_factory=list)
     assertions: Optional[AssertConfig] = None
     loop: Optional[LoopConfig] = None
@@ -167,6 +192,7 @@ class ScenarioStep:
             "params": self.params,
             "headers": self.headers,
             "payload": self.payload,
+            "files": [f.to_dict() for f in self.files],
             "captures": [c.to_dict() for c in self.captures],
             "assertions": self.assertions.to_dict() if self.assertions else None,
             "loop": self.loop.to_dict() if self.loop else None,

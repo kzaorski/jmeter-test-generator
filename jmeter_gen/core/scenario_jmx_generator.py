@@ -17,11 +17,34 @@ from jmeter_gen.core.scenario_data import (
     AssertConfig,
     CorrelationMapping,
     CorrelationResult,
+    FileConfig,
     LoopConfig,
     ParsedScenario,
     ScenarioStep,
 )
 from jmeter_gen.exceptions import JMXGenerationException
+
+# MIME type auto-detection map
+MIME_TYPE_MAP = {
+    ".pdf": "application/pdf",
+    ".json": "application/json",
+    ".xml": "application/xml",
+    ".txt": "text/plain",
+    ".csv": "text/csv",
+    ".html": "text/html",
+    ".htm": "text/html",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".gif": "image/gif",
+    ".svg": "image/svg+xml",
+    ".doc": "application/msword",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".xls": "application/vnd.ms-excel",
+    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ".zip": "application/zip",
+    ".gz": "application/gzip",
+}
 
 # Pattern to extract JSONPath field from while condition
 # e.g., "$.status != 'finished'" -> "status"
@@ -302,6 +325,12 @@ class ScenarioJMXGenerator:
                         ET.SubElement(sampler_hashtree, "hashTree")
                         assertions_created += 1
 
+                # Add think_time (ConstantTimer) after sampler if present on endpoint step
+                if step.think_time is not None and step.endpoint_type != "think_time":
+                    timer = self._create_constant_timer(step.think_time, "Think Time")
+                    tc_hashtree.append(timer)
+                    ET.SubElement(tc_hashtree, "hashTree")
+
                 # Collect captured variables for subsequent steps
                 for mapping in step_mappings:
                     available_vars.add(mapping.variable_name)
@@ -423,6 +452,12 @@ class ScenarioJMXGenerator:
                 sampler_hashtree.append(assertion)
                 ET.SubElement(sampler_hashtree, "hashTree")
                 result["assertions"] += 1
+
+        # Add think_time (ConstantTimer) after sampler if present on endpoint step
+        if step.think_time is not None and step.endpoint_type != "think_time":
+            timer = self._create_constant_timer(step.think_time, "Think Time")
+            tc_hashtree.append(timer)
+            ET.SubElement(tc_hashtree, "hashTree")
 
         return result
 
@@ -606,6 +641,11 @@ class ScenarioJMXGenerator:
             ET.SubElement(body_arg, "boolProp", {"name": "HTTPArgument.always_encode"}).text = "false"
             ET.SubElement(body_arg, "stringProp", {"name": "Argument.value"}).text = payload_json
             ET.SubElement(body_arg, "stringProp", {"name": "Argument.metadata"}).text = "="
+
+        # Add file upload args if files are present
+        if step.files:
+            file_args = self._create_file_args(step.files)
+            sampler.append(file_args)
 
         return sampler
 
@@ -1251,6 +1291,70 @@ class ScenarioJMXGenerator:
         ).text = str(delay_ms)
 
         return timer
+
+    def _create_file_args(self, files: list[FileConfig]) -> ET.Element:
+        """Create HTTPFileArgs element for file uploads.
+
+        Args:
+            files: List of FileConfig objects
+
+        Returns:
+            HTTPFileArgs XML Element
+        """
+        file_args = ET.Element(
+            "elementProp",
+            {
+                "name": "HTTPsampler.Files",
+                "elementType": "HTTPFileArgs",
+            },
+        )
+        collection = ET.SubElement(
+            file_args,
+            "collectionProp",
+            {"name": "HTTPFileArgs.files"},
+        )
+
+        for file_config in files:
+            # Determine MIME type - use explicit or auto-detect from extension
+            mime_type = file_config.mime_type
+            if not mime_type:
+                # Auto-detect from file extension
+                file_path = file_config.path
+                # Handle variables in path - just use extension if present
+                if "." in file_path:
+                    ext = "." + file_path.rsplit(".", 1)[-1].lower()
+                    # Remove any trailing variable syntax
+                    if "}" in ext:
+                        ext = ""
+                    mime_type = MIME_TYPE_MAP.get(ext, "application/octet-stream")
+                else:
+                    mime_type = "application/octet-stream"
+
+            file_elem = ET.SubElement(
+                collection,
+                "elementProp",
+                {
+                    "name": file_config.path,
+                    "elementType": "HTTPFileArg",
+                },
+            )
+            ET.SubElement(
+                file_elem,
+                "stringProp",
+                {"name": "File.path"},
+            ).text = file_config.path
+            ET.SubElement(
+                file_elem,
+                "stringProp",
+                {"name": "File.paramname"},
+            ).text = file_config.param
+            ET.SubElement(
+                file_elem,
+                "stringProp",
+                {"name": "File.mimetype"},
+            ).text = mime_type
+
+        return file_args
 
     def _create_condition_extractor(self, condition: str) -> Optional[ET.Element]:
         """Create JSONPostProcessor to extract variable used in while condition.

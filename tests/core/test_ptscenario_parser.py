@@ -621,3 +621,142 @@ scenario:
             parser.parse(scenario_file)
 
         assert "think_time" in str(exc_info.value).lower()
+
+
+class TestFileUploadParsing:
+    """Tests for file upload (files) field parsing."""
+
+    @pytest.fixture
+    def parser(self):
+        """Create a parser instance."""
+        return PtScenarioParser()
+
+    def test_parse_single_file(self, parser, tmp_path):
+        """Test parsing step with single file upload."""
+        scenario_content = """version: "1.0"
+name: "File Upload Test"
+scenario:
+  - name: "Upload Document"
+    endpoint: "POST /api/documents/upload"
+    files:
+      - path: "test-data/document.pdf"
+        param: "file"
+"""
+        scenario_file = tmp_path / "single_file.yaml"
+        scenario_file.write_text(scenario_content)
+
+        scenario = parser.parse(scenario_file)
+        step = scenario.steps[0]
+
+        assert len(step.files) == 1
+        assert step.files[0].path == "test-data/document.pdf"
+        assert step.files[0].param == "file"
+        assert step.files[0].mime_type is None
+
+    def test_parse_file_with_mime_type(self, parser, tmp_path):
+        """Test parsing file upload with explicit mime_type."""
+        scenario_content = """version: "1.0"
+name: "File Upload Test"
+scenario:
+  - name: "Upload Image"
+    endpoint: "POST /api/images"
+    files:
+      - path: "uploads/image.png"
+        param: "avatar"
+        mime_type: "image/png"
+"""
+        scenario_file = tmp_path / "file_mime_type.yaml"
+        scenario_file.write_text(scenario_content)
+
+        scenario = parser.parse(scenario_file)
+        step = scenario.steps[0]
+
+        assert len(step.files) == 1
+        assert step.files[0].path == "uploads/image.png"
+        assert step.files[0].param == "avatar"
+        assert step.files[0].mime_type == "image/png"
+
+    def test_parse_multiple_files(self, parser, tmp_path):
+        """Test parsing step with multiple file uploads."""
+        scenario_content = """version: "1.0"
+name: "Multi-File Upload Test"
+scenario:
+  - name: "Upload Multiple"
+    endpoint: "POST /api/attachments"
+    files:
+      - path: "documents/report.pdf"
+        param: "document"
+        mime_type: "application/pdf"
+      - path: "images/logo.png"
+        param: "logo"
+        mime_type: "image/png"
+"""
+        scenario_file = tmp_path / "multi_file.yaml"
+        scenario_file.write_text(scenario_content)
+
+        scenario = parser.parse(scenario_file)
+        step = scenario.steps[0]
+
+        assert len(step.files) == 2
+        assert step.files[0].path == "documents/report.pdf"
+        assert step.files[0].param == "document"
+        assert step.files[1].path == "images/logo.png"
+        assert step.files[1].param == "logo"
+
+    def test_parse_step_without_files(self, parser, tmp_path):
+        """Test that step without files has empty files list."""
+        scenario_content = """version: "1.0"
+name: "No Files Test"
+scenario:
+  - name: "Simple Request"
+    endpoint: "GET /api/test"
+"""
+        scenario_file = tmp_path / "no_files.yaml"
+        scenario_file.write_text(scenario_content)
+
+        scenario = parser.parse(scenario_file)
+        step = scenario.steps[0]
+
+        assert step.files == []
+
+    def test_parse_file_with_variable_in_path(self, parser, tmp_path):
+        """Test parsing file with JMeter variable in path."""
+        scenario_content = """version: "1.0"
+name: "Variable Path Test"
+scenario:
+  - name: "Upload Variable File"
+    endpoint: "POST /api/upload"
+    files:
+      - path: "${data_dir}/upload.pdf"
+        param: "file"
+"""
+        scenario_file = tmp_path / "variable_path.yaml"
+        scenario_file.write_text(scenario_content)
+
+        scenario = parser.parse(scenario_file)
+        step = scenario.steps[0]
+
+        assert len(step.files) == 1
+        assert step.files[0].path == "${data_dir}/upload.pdf"
+
+    def test_file_config_to_dict(self, parser, tmp_path):
+        """Test FileConfig.to_dict() serialization."""
+        scenario_content = """version: "1.0"
+name: "Test"
+scenario:
+  - name: "Upload"
+    endpoint: "POST /upload"
+    files:
+      - path: "report.pdf"
+        param: "file"
+        mime_type: "application/pdf"
+"""
+        scenario_file = tmp_path / "file_dict.yaml"
+        scenario_file.write_text(scenario_content)
+
+        scenario = parser.parse(scenario_file)
+        file_dict = scenario.steps[0].files[0].to_dict()
+
+        assert file_dict["path"] == "report.pdf"
+        assert file_dict["param"] == "file"
+        assert file_dict["mime_type"] == "application/pdf"

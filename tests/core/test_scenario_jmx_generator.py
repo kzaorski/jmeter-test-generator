@@ -1643,3 +1643,346 @@ paths:
                 break
 
         assert found_timer, "ConstantTimer with 2000ms delay not found"
+
+
+class TestFileUploadGeneration:
+    """Tests for file upload (HTTPFileArgs) JMX generation."""
+
+    @pytest.fixture
+    def parser(self, tmp_path):
+        """Create a parser instance."""
+        spec_content = """openapi: 3.0.0
+info:
+  title: Test API
+  version: 1.0.0
+paths:
+  /upload:
+    post:
+      operationId: uploadFile
+      responses:
+        '201':
+          description: Created
+"""
+        spec_path = tmp_path / "spec.yaml"
+        spec_path.write_text(spec_content)
+        parser = OpenAPIParser()
+        parser.parse(str(spec_path))
+        return parser
+
+    @pytest.fixture
+    def generator(self, parser):
+        """Create a generator instance."""
+        return ScenarioJMXGenerator(parser)
+
+    def test_generate_single_file_upload(self, generator, tmp_path):
+        """Test JMX generation with single file upload."""
+        from jmeter_gen.core.scenario_data import FileConfig
+
+        scenario = ParsedScenario(
+            name="File Upload Test",
+            description=None,
+            settings=ScenarioSettings(base_url="http://localhost:8000"),
+            variables={},
+            steps=[
+                ScenarioStep(
+                    name="Upload Document",
+                    endpoint="POST /upload",
+                    endpoint_type="method_path",
+                    method="POST",
+                    path="/upload",
+                    files=[
+                        FileConfig(
+                            path="test-data/document.pdf",
+                            param="file",
+                            mime_type="application/pdf",
+                        )
+                    ],
+                ),
+            ],
+        )
+
+        output_path = tmp_path / "single_file.jmx"
+
+        result = generator.generate(
+            scenario=scenario,
+            output_path=str(output_path),
+        )
+
+        assert result["success"] is True
+
+        tree = ET.parse(output_path)
+        root = tree.getroot()
+
+        # Find HTTPFileArgs
+        file_args = root.find(".//elementProp[@name='HTTPsampler.Files']")
+        assert file_args is not None, "HTTPsampler.Files element not found"
+
+        # Find file entry
+        file_elem = root.find(".//elementProp[@elementType='HTTPFileArg']")
+        assert file_elem is not None, "HTTPFileArg element not found"
+
+        # Check file properties
+        path_prop = file_elem.find(".//stringProp[@name='File.path']")
+        assert path_prop is not None
+        assert path_prop.text == "test-data/document.pdf"
+
+        param_prop = file_elem.find(".//stringProp[@name='File.paramname']")
+        assert param_prop is not None
+        assert param_prop.text == "file"
+
+        mime_prop = file_elem.find(".//stringProp[@name='File.mimetype']")
+        assert mime_prop is not None
+        assert mime_prop.text == "application/pdf"
+
+    def test_generate_multiple_files(self, generator, tmp_path):
+        """Test JMX generation with multiple file uploads."""
+        from jmeter_gen.core.scenario_data import FileConfig
+
+        scenario = ParsedScenario(
+            name="Multi-File Upload Test",
+            description=None,
+            settings=ScenarioSettings(base_url="http://localhost:8000"),
+            variables={},
+            steps=[
+                ScenarioStep(
+                    name="Upload Multiple",
+                    endpoint="POST /upload",
+                    endpoint_type="method_path",
+                    method="POST",
+                    path="/upload",
+                    files=[
+                        FileConfig(
+                            path="documents/report.pdf",
+                            param="document",
+                            mime_type="application/pdf",
+                        ),
+                        FileConfig(
+                            path="images/logo.png",
+                            param="logo",
+                            mime_type="image/png",
+                        ),
+                    ],
+                ),
+            ],
+        )
+
+        output_path = tmp_path / "multi_file.jmx"
+
+        result = generator.generate(
+            scenario=scenario,
+            output_path=str(output_path),
+        )
+
+        assert result["success"] is True
+
+        tree = ET.parse(output_path)
+        root = tree.getroot()
+
+        # Find all HTTPFileArg elements
+        file_elems = root.findall(".//elementProp[@elementType='HTTPFileArg']")
+        assert len(file_elems) == 2
+
+        # Verify both files are present
+        paths = []
+        for elem in file_elems:
+            path_prop = elem.find(".//stringProp[@name='File.path']")
+            if path_prop is not None:
+                paths.append(path_prop.text)
+
+        assert "documents/report.pdf" in paths
+        assert "images/logo.png" in paths
+
+    def test_generate_file_auto_mime_type(self, generator, tmp_path):
+        """Test JMX generation auto-detects MIME type from extension."""
+        from jmeter_gen.core.scenario_data import FileConfig
+
+        scenario = ParsedScenario(
+            name="Auto MIME Test",
+            description=None,
+            settings=ScenarioSettings(base_url="http://localhost:8000"),
+            variables={},
+            steps=[
+                ScenarioStep(
+                    name="Upload File",
+                    endpoint="POST /upload",
+                    endpoint_type="method_path",
+                    method="POST",
+                    path="/upload",
+                    files=[
+                        FileConfig(
+                            path="image.png",
+                            param="file",
+                            mime_type=None,  # Should auto-detect
+                        )
+                    ],
+                ),
+            ],
+        )
+
+        output_path = tmp_path / "auto_mime.jmx"
+
+        result = generator.generate(
+            scenario=scenario,
+            output_path=str(output_path),
+        )
+
+        assert result["success"] is True
+
+        tree = ET.parse(output_path)
+        root = tree.getroot()
+
+        # Find MIME type
+        file_elem = root.find(".//elementProp[@elementType='HTTPFileArg']")
+        assert file_elem is not None
+
+        mime_prop = file_elem.find(".//stringProp[@name='File.mimetype']")
+        assert mime_prop is not None
+        assert mime_prop.text == "image/png"
+
+    def test_generate_file_explicit_mime_type_override(self, generator, tmp_path):
+        """Test that explicit MIME type overrides auto-detection."""
+        from jmeter_gen.core.scenario_data import FileConfig
+
+        scenario = ParsedScenario(
+            name="Explicit MIME Test",
+            description=None,
+            settings=ScenarioSettings(base_url="http://localhost:8000"),
+            variables={},
+            steps=[
+                ScenarioStep(
+                    name="Upload File",
+                    endpoint="POST /upload",
+                    endpoint_type="method_path",
+                    method="POST",
+                    path="/upload",
+                    files=[
+                        FileConfig(
+                            path="data.txt",
+                            param="file",
+                            mime_type="application/octet-stream",  # Override text/plain
+                        )
+                    ],
+                ),
+            ],
+        )
+
+        output_path = tmp_path / "explicit_mime.jmx"
+
+        result = generator.generate(
+            scenario=scenario,
+            output_path=str(output_path),
+        )
+
+        assert result["success"] is True
+
+        tree = ET.parse(output_path)
+        root = tree.getroot()
+
+        file_elem = root.find(".//elementProp[@elementType='HTTPFileArg']")
+        assert file_elem is not None
+
+        mime_prop = file_elem.find(".//stringProp[@name='File.mimetype']")
+        assert mime_prop is not None
+        assert mime_prop.text == "application/octet-stream"
+
+    def test_generate_step_without_files(self, generator, tmp_path):
+        """Test that step without files doesn't create HTTPFileArgs."""
+        scenario = ParsedScenario(
+            name="No Files Test",
+            description=None,
+            settings=ScenarioSettings(base_url="http://localhost:8000"),
+            variables={},
+            steps=[
+                ScenarioStep(
+                    name="Simple POST",
+                    endpoint="POST /upload",
+                    endpoint_type="method_path",
+                    method="POST",
+                    path="/upload",
+                    files=[],  # Empty files list
+                ),
+            ],
+        )
+
+        output_path = tmp_path / "no_files.jmx"
+
+        result = generator.generate(
+            scenario=scenario,
+            output_path=str(output_path),
+        )
+
+        assert result["success"] is True
+
+        tree = ET.parse(output_path)
+        root = tree.getroot()
+
+        # HTTPsampler.Files should NOT exist
+        file_args = root.find(".//elementProp[@name='HTTPsampler.Files']")
+        assert file_args is None, "HTTPsampler.Files should not exist for steps without files"
+
+    def test_create_file_args_method(self, generator):
+        """Test _create_file_args method directly."""
+        from jmeter_gen.core.scenario_data import FileConfig
+
+        files = [
+            FileConfig(path="report.pdf", param="file", mime_type="application/pdf"),
+            FileConfig(path="data.json", param="data", mime_type="application/json"),
+        ]
+
+        file_args = generator._create_file_args(files)
+
+        assert file_args.tag == "elementProp"
+        assert file_args.get("name") == "HTTPsampler.Files"
+        assert file_args.get("elementType") == "HTTPFileArgs"
+
+        collection = file_args.find("collectionProp[@name='HTTPFileArgs.files']")
+        assert collection is not None
+
+        file_elems = collection.findall("elementProp[@elementType='HTTPFileArg']")
+        assert len(file_elems) == 2
+
+    def test_file_upload_with_variable_path(self, generator, tmp_path):
+        """Test file upload with JMeter variable in path."""
+        from jmeter_gen.core.scenario_data import FileConfig
+
+        scenario = ParsedScenario(
+            name="Variable Path Test",
+            description=None,
+            settings=ScenarioSettings(base_url="http://localhost:8000"),
+            variables={"data_dir": "/path/to/data"},
+            steps=[
+                ScenarioStep(
+                    name="Upload Variable File",
+                    endpoint="POST /upload",
+                    endpoint_type="method_path",
+                    method="POST",
+                    path="/upload",
+                    files=[
+                        FileConfig(
+                            path="${data_dir}/upload.pdf",
+                            param="file",
+                            mime_type="application/pdf",
+                        )
+                    ],
+                ),
+            ],
+        )
+
+        output_path = tmp_path / "variable_path.jmx"
+
+        result = generator.generate(
+            scenario=scenario,
+            output_path=str(output_path),
+        )
+
+        assert result["success"] is True
+
+        tree = ET.parse(output_path)
+        root = tree.getroot()
+
+        file_elem = root.find(".//elementProp[@elementType='HTTPFileArg']")
+        assert file_elem is not None
+
+        path_prop = file_elem.find(".//stringProp[@name='File.path']")
+        assert path_prop is not None
+        assert path_prop.text == "${data_dir}/upload.pdf"
