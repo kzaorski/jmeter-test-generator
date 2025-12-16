@@ -191,7 +191,7 @@ Output (formatted response)
   - `jmeter-gen new scenario` command
   - Auto-detect OpenAPI spec, smart capture suggestions
   - Loop and think time support
-- **Overall**: 691 tests passing, 82% code coverage
+- **Overall**: 712 tests passing, 74% code coverage
 - Project structure and configuration (pyproject.toml)
 - Package initialization files
 - Comprehensive documentation (23 docs in docs/)

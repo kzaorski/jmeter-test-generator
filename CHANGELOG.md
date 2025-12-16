@@ -5,6 +5,26 @@ All notable changes to the JMeter Test Generator project will be documented in t
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.3.0] - 2025-12-16
+
+### Added
+- **`--no-scenario` Flag** - New option for `generate` command
+  - Skips scenario file detection
+  - Forces OpenAPI-based generation even when pt_scenario.yaml exists
+- **Generation Options Menu** - When scenario file is found during `analyze`
+  - Option 1: Generate from scenario (recommended)
+  - Option 2: Generate from OpenAPI spec only (uses `--no-scenario`)
+  - Option 3: Don't generate now
+
+### Changed
+- `analyze` output now shows relative paths instead of full paths for better readability
+- Improved snapshot path comparison to handle macOS symlinks (`/var` -> `/private/var`)
+
+### Fixed
+- Path truncation issues in Rich tables when displaying long file paths
+
+---
+
 ## [3.2.2] - 2025-12-03
 
 ### Added
