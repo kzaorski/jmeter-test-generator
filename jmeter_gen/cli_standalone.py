@@ -255,14 +255,21 @@ def analyze(
                 scenario = scenario_parser.parse(scenario_path)
                 console.print(f"  [dim]Name:[/dim] {scenario.name}")
                 console.print(f"  [dim]Steps:[/dim] {len(scenario.steps)}")
-                # Prompt to run generate
-                if click.confirm("\nRun generate now?", default=True):
+
+                # Show generation options
+                console.print("\n[bold]Generation options:[/bold]")
+                console.print("  1. Generate from scenario (recommended)")
+                console.print("  2. Generate from OpenAPI spec only")
+                console.print("  3. Don't generate now")
+
+                choice = console.input("\nSelect option [1]: ").strip() or "1"
+
+                if choice == "1":
                     ctx.invoke(generate)
+                elif choice == "2":
+                    ctx.invoke(generate, no_scenario=True)
                 else:
-                    console.print(
-                        "[dim]Next step: jmeter-gen generate "
-                        "(will use scenario-based generation)[/dim]"
-                    )
+                    console.print("[dim]Next step: jmeter-gen generate[/dim]")
             except Exception as e:
                 console.print(f"  [yellow]Warning: Could not parse scenario: {e}[/yellow]")
                 # No suggestion when scenario parsing fails - user must fix scenario first
@@ -376,6 +383,11 @@ def _display_change_detection_results(result: dict, show_details: bool) -> None:
     is_flag=True,
     help="Don't save snapshot (one-time generation)",
 )
+@click.option(
+    "--no-scenario",
+    is_flag=True,
+    help="Skip scenario file, use OpenAPI-based generation",
+)
 def generate(
     spec: Optional[str],
     output: Optional[str],
@@ -387,6 +399,7 @@ def generate(
     auto_update: bool,
     force_new: bool,
     no_snapshot: bool,
+    no_scenario: bool,
 ):
     """Generate JMeter JMX test plan from OpenAPI specification.
 
@@ -458,8 +471,10 @@ def generate(
 
             console.print(f"[green]✓[/green] Using spec: {spec}\n")
 
-        # v2: Check for scenario file
-        scenario_path = analyzer.find_scenario_file("." if not spec else str(Path(spec).parent))
+        # v2: Check for scenario file (unless --no-scenario)
+        scenario_path = None
+        if not no_scenario:
+            scenario_path = analyzer.find_scenario_file("." if not spec else str(Path(spec).parent))
         if scenario_path:
             console.print(f"[bold magenta]Scenario file found:[/bold magenta] {scenario_path}")
             console.print("[dim]Using scenario-based generation (v2)[/dim]\n")

@@ -104,7 +104,8 @@ class TestAnalyzeCommand:
         assert result.exit_code == 0
         assert "Analyzing project" in result.output
         assert "OpenAPI Specification Found" in result.output
-        assert "/path/to/openapi.yaml" in result.output
+        # Table shows just the filename, not the full path
+        assert "openapi.yaml" in result.output
         assert "Test API" in result.output
         mock_analyzer.analyze_with_change_detection.assert_called_once_with(".", None)
 
@@ -1379,3 +1380,280 @@ class TestUserInteraction:
         # Verify the specified output path was used
         call_args = mock_generator.generate.call_args[1]
         assert call_args["output_path"] == str(output_file)
+
+
+class TestNoScenarioFlag:
+    """Tests for --no-scenario flag in generate command."""
+
+    @pytest.fixture
+    def runner(self) -> CliRunner:
+        """Create a Click CLI runner for testing."""
+        return CliRunner()
+
+    @pytest.fixture
+    def mock_spec_data(self) -> dict:
+        """Create mock OpenAPI spec data."""
+        return {
+            "title": "Test API",
+            "base_url": "http://localhost:8080",
+            "endpoints": [
+                {"path": "/api/test", "method": "GET", "operationId": "getTest"}
+            ],
+        }
+
+    @pytest.fixture(autouse=True)
+    def mock_jmx_validator(self):
+        """Mock JMXValidator for all generate tests."""
+        with patch("jmeter_gen.cli.JMXValidator") as mock_validator_class:
+            mock_validator = Mock()
+            mock_validator_class.return_value = mock_validator
+            mock_validator.validate.return_value = {"valid": True, "issues": [], "recommendations": []}
+            yield mock_validator_class
+
+    @patch("jmeter_gen.cli.JMXGenerator")
+    @patch("jmeter_gen.cli.OpenAPIParser")
+    @patch("jmeter_gen.cli.ProjectAnalyzer")
+    def test_generate_no_scenario_flag_skips_scenario_detection(
+        self,
+        mock_analyzer_class: Mock,
+        mock_parser_class: Mock,
+        mock_generator_class: Mock,
+        runner: CliRunner,
+        tmp_path: Path,
+        mock_spec_data: dict,
+    ):
+        """Test that --no-scenario flag skips scenario file detection."""
+        spec_file = tmp_path / "openapi.yaml"
+        spec_file.write_text("openapi: 3.0.0")
+        output_file = tmp_path / "test.jmx"
+
+        mock_analyzer = Mock()
+        mock_analyzer_class.return_value = mock_analyzer
+        # Scenario file exists but should be ignored
+        mock_analyzer.find_scenario_file.return_value = str(tmp_path / "pt_scenario.yaml")
+
+        mock_parser = Mock()
+        mock_parser_class.return_value = mock_parser
+        mock_parser.parse.return_value = mock_spec_data
+
+        mock_generator = Mock()
+        mock_generator_class.return_value = mock_generator
+        mock_generator.generate.return_value = {
+            "success": True,
+            "jmx_path": str(output_file),
+            "samplers_created": 1,
+            "assertions_added": 1,
+            "threads": 1,
+            "rampup": 0,
+            "duration": None,
+        }
+
+        result = runner.invoke(
+            generate,
+            [
+                "--spec", str(spec_file),
+                "--output", str(output_file),
+                "--base-url", "http://localhost:8080",
+                "--no-scenario",
+            ],
+        )
+
+        assert result.exit_code == 0
+        # Verify find_scenario_file was NOT called
+        mock_analyzer.find_scenario_file.assert_not_called()
+        # Verify OpenAPI-based generation was used (not scenario)
+        assert "Scenario file found" not in result.output
+        mock_generator.generate.assert_called_once()
+
+    @patch("jmeter_gen.cli.JMXGenerator")
+    @patch("jmeter_gen.cli.OpenAPIParser")
+    @patch("jmeter_gen.cli.ProjectAnalyzer")
+    def test_generate_without_no_scenario_uses_scenario_if_found(
+        self,
+        mock_analyzer_class: Mock,
+        mock_parser_class: Mock,
+        mock_generator_class: Mock,
+        runner: CliRunner,
+        tmp_path: Path,
+        mock_spec_data: dict,
+    ):
+        """Test that without --no-scenario, scenario file is detected."""
+        spec_file = tmp_path / "openapi.yaml"
+        spec_file.write_text("openapi: 3.0.0")
+
+        mock_analyzer = Mock()
+        mock_analyzer_class.return_value = mock_analyzer
+        mock_analyzer.find_scenario_file.return_value = None  # No scenario
+
+        mock_parser = Mock()
+        mock_parser_class.return_value = mock_parser
+        mock_parser.parse.return_value = mock_spec_data
+
+        mock_generator = Mock()
+        mock_generator_class.return_value = mock_generator
+        mock_generator.generate.return_value = {
+            "success": True,
+            "jmx_path": str(tmp_path / "test.jmx"),
+            "samplers_created": 1,
+            "assertions_added": 1,
+            "threads": 1,
+            "rampup": 0,
+            "duration": None,
+        }
+
+        result = runner.invoke(
+            generate,
+            [
+                "--spec", str(spec_file),
+                "--output", str(tmp_path / "test.jmx"),
+                "--base-url", "http://localhost:8080",
+            ],
+        )
+
+        assert result.exit_code == 0
+        # Verify find_scenario_file WAS called
+        mock_analyzer.find_scenario_file.assert_called_once()
+
+
+class TestAnalyzeGenerationOptions:
+    """Tests for generation options in analyze command when scenario exists."""
+
+    @pytest.fixture
+    def runner(self) -> CliRunner:
+        """Create a Click CLI runner for testing."""
+        return CliRunner()
+
+    @pytest.fixture
+    def mock_spec_data(self) -> dict:
+        """Create mock OpenAPI spec data."""
+        return {
+            "title": "Test API",
+            "base_url": "http://localhost:8080",
+            "endpoints": [
+                {"path": "/api/test", "method": "GET", "operationId": "getTest"}
+            ],
+        }
+
+    @pytest.fixture(autouse=True)
+    def mock_jmx_validator(self):
+        """Mock JMXValidator for generate tests."""
+        with patch("jmeter_gen.cli.JMXValidator") as mock_validator_class:
+            mock_validator = Mock()
+            mock_validator_class.return_value = mock_validator
+            mock_validator.validate.return_value = {"valid": True, "issues": [], "recommendations": []}
+            yield mock_validator_class
+
+    @patch("jmeter_gen.cli.PtScenarioParser")
+    @patch("jmeter_gen.cli.ProjectAnalyzer")
+    def test_analyze_with_scenario_shows_generation_options(
+        self,
+        mock_analyzer_class: Mock,
+        mock_scenario_parser_class: Mock,
+        runner: CliRunner,
+        tmp_path: Path,
+    ):
+        """Test that analyze shows generation options when scenario is found."""
+        spec_file = tmp_path / "openapi.yaml"
+        spec_file.write_text("openapi: 3.0.0")
+        scenario_file = tmp_path / "pt_scenario.yaml"
+        scenario_file.write_text("name: Test\nscenario:\n  - endpoint: GET /test")
+
+        mock_analyzer = Mock()
+        mock_analyzer_class.return_value = mock_analyzer
+        mock_analyzer.analyze_project.return_value = {
+            "openapi_spec_found": True,
+            "spec_path": str(spec_file),
+            "spec_format": "yaml",
+            "api_title": "Test API",
+            "endpoints_count": 1,
+            "recommended_jmx_name": "test.jmx",
+            "available_specs": [{"spec_path": str(spec_file), "format": "yaml"}],
+            "multiple_specs_found": False,
+        }
+        mock_analyzer.find_scenario_file.return_value = str(scenario_file)
+
+        # Mock scenario parser
+        mock_scenario_parser = Mock()
+        mock_scenario_parser_class.return_value = mock_scenario_parser
+        mock_scenario = Mock()
+        mock_scenario.name = "Test Scenario"
+        mock_scenario.steps = [Mock()]
+        mock_scenario_parser.parse.return_value = mock_scenario
+
+        # Select option 3 (don't generate), use --no-detect-changes to avoid needing more mocks
+        result = runner.invoke(analyze, ["--path", str(tmp_path), "--no-detect-changes"], input="3\n")
+
+        assert result.exit_code == 0
+        assert "Scenario file found" in result.output
+        assert "Generation options:" in result.output
+        assert "1. Generate from scenario" in result.output
+        assert "2. Generate from OpenAPI spec only" in result.output
+        assert "3. Don't generate now" in result.output
+
+    @patch("jmeter_gen.cli.PtScenarioParser")
+    @patch("jmeter_gen.cli.JMXGenerator")
+    @patch("jmeter_gen.cli.OpenAPIParser")
+    @patch("jmeter_gen.cli.ProjectAnalyzer")
+    def test_analyze_option_2_invokes_generate_with_no_scenario(
+        self,
+        mock_analyzer_class: Mock,
+        mock_parser_class: Mock,
+        mock_generator_class: Mock,
+        mock_scenario_parser_class: Mock,
+        runner: CliRunner,
+        tmp_path: Path,
+        mock_spec_data: dict,
+    ):
+        """Test that option 2 in analyze invokes generate with no_scenario=True."""
+        spec_file = tmp_path / "openapi.yaml"
+        spec_file.write_text("openapi: 3.0.0")
+        scenario_file = tmp_path / "pt_scenario.yaml"
+        scenario_file.write_text("name: Test\nscenario:\n  - endpoint: GET /test")
+
+        mock_analyzer = Mock()
+        mock_analyzer_class.return_value = mock_analyzer
+        mock_analyzer.analyze_project.return_value = {
+            "openapi_spec_found": True,
+            "spec_path": str(spec_file),
+            "spec_format": "yaml",
+            "api_title": "Test API",
+            "endpoints_count": 1,
+            "recommended_jmx_name": "test.jmx",
+            "available_specs": [{"spec_path": str(spec_file), "format": "yaml"}],
+            "multiple_specs_found": False,
+        }
+        mock_analyzer.find_scenario_file.return_value = str(scenario_file)
+
+        # Mock scenario parser for analyze command
+        mock_scenario_parser = Mock()
+        mock_scenario_parser_class.return_value = mock_scenario_parser
+        mock_scenario = Mock()
+        mock_scenario.name = "Test Scenario"
+        mock_scenario.steps = [Mock()]
+        mock_scenario_parser.parse.return_value = mock_scenario
+
+        mock_parser = Mock()
+        mock_parser_class.return_value = mock_parser
+        mock_parser.parse.return_value = mock_spec_data
+
+        mock_generator = Mock()
+        mock_generator_class.return_value = mock_generator
+        mock_generator.generate.return_value = {
+            "success": True,
+            "jmx_path": str(tmp_path / "test.jmx"),
+            "samplers_created": 1,
+            "assertions_added": 1,
+            "threads": 1,
+            "rampup": 0,
+            "duration": None,
+        }
+
+        # Select option 2 (OpenAPI spec only), then provide inputs for generate
+        # Input: "2" for option, "\n" for output folder, "\n" for base URL
+        # Use --no-detect-changes to avoid needing more mocks
+        result = runner.invoke(analyze, ["--path", str(tmp_path), "--no-detect-changes"], input="2\n\n\n")
+
+        assert result.exit_code == 0
+        # When option 2 is selected, generate should be called with no_scenario
+        # and find_scenario_file should NOT be called again during generate
+        # (it's skipped due to no_scenario=True)

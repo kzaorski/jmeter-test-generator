@@ -194,11 +194,17 @@ class SnapshotManager:
         if not self.snapshot_dir.exists():
             return None
 
+        # Resolve spec_path to handle symlinks (e.g., /var -> /private/var on macOS)
+        resolved_spec_path = str(Path(spec_path).resolve())
+
         for snapshot_file in self.snapshot_dir.glob("*.spec.json"):
             try:
                 with open(snapshot_file, "r", encoding="utf-8") as f:
                     snapshot = json.load(f)
-                if snapshot.get("spec", {}).get("path") == spec_path:
+                stored_path = snapshot.get("spec", {}).get("path", "")
+                # Resolve stored path for comparison
+                resolved_stored_path = str(Path(stored_path).resolve())
+                if resolved_stored_path == resolved_spec_path:
                     return (snapshot, snapshot_file)
             except json.JSONDecodeError as e:
                 raise SnapshotLoadException(
