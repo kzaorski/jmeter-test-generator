@@ -174,17 +174,21 @@ def analyze(
                 show_header=True,
             )
             specs_table.add_column("#", style="dim", width=3)
-            specs_table.add_column("File", style="cyan")
+            specs_table.add_column("Path", style="cyan")
             specs_table.add_column("Format", style="green")
             specs_table.add_column("Status", style="yellow")
 
             for idx, spec in enumerate(available_specs, 1):
                 # Check snapshot status for each spec
                 status = _get_spec_status(spec["spec_path"])
-                spec_filename = Path(spec["spec_path"]).name
+                spec_path = Path(spec["spec_path"])
+                try:
+                    relative_path = str(spec_path.relative_to(Path.cwd()))
+                except ValueError:
+                    relative_path = spec_path.name
                 specs_table.add_row(
                     str(idx),
-                    spec_filename,
+                    relative_path,
                     spec["format"],
                     status,
                 )
@@ -201,9 +205,14 @@ def analyze(
             table.add_column("Property", style="cyan")
             table.add_column("Value", style="green")
 
-            # Show filename for readability
+            # Show relative path for readability
             spec_path = Path(result["spec_path"])
-            table.add_row("Spec File", spec_path.name)
+            try:
+                relative_path = spec_path.relative_to(Path.cwd())
+            except ValueError:
+                # If path is not relative to cwd, show filename only
+                relative_path = spec_path.name
+            table.add_row("Spec File", str(relative_path))
             table.add_row("Format", result["spec_format"])
             table.add_row("API Title", result["api_title"])
             table.add_row("Endpoints", str(result["endpoints_count"]))
