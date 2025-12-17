@@ -85,9 +85,16 @@ CLI:
 - MCP Python SDK
 - stdio transport
 
-**Tools**:
-1. `analyze_project_for_jmeter` - Project analysis
-2. `generate_jmx_from_openapi` - JMX generation
+**Tools** (9 total):
+1. `analyze_project_for_jmeter` - Project analysis with change detection
+2. `generate_jmx_from_openapi` - JMX generation from OpenAPI spec
+3. `generate_scenario_jmx` - JMX generation from pt_scenario.yaml
+4. `validate_jmx` - Validate JMX file structure
+5. `validate_scenario` - Validate pt_scenario.yaml before generation
+6. `visualize_scenario` - Visualize scenario with Mermaid diagram
+7. `list_endpoints` - List all endpoints from OpenAPI spec
+8. `suggest_captures` - Suggest capturable variables for endpoint
+9. `build_scenario` - Build pt_scenario.yaml from step definitions
 
 **Example Flow**:
 ```
@@ -453,33 +460,34 @@ Legend:
 ## File Structure
 
 ```
-app/
+jmeter-test-generator/
 ├── jmeter_gen/
 │   ├── __init__.py               # Package initialization
-│   ├── cli.py                    # CLI interface (click)
+│   ├── cli.py                    # CLI interface (Click)
 │   ├── mcp_server.py             # MCP Server interface
+│   ├── exceptions.py             # Custom exceptions
 │   └── core/
 │       ├── __init__.py
 │       ├── project_analyzer.py   # Find OpenAPI specs
 │       ├── openapi_parser.py     # Parse OpenAPI
 │       ├── jmx_generator.py      # Generate JMX
-│       └── jmx_validator.py      # Validate JMX
-├── templates/
-│   ├── test_plan_base.xml        # Test Plan template
-│   ├── thread_group.xml          # Thread Group template
-│   ├── http_sampler.xml          # HTTP Sampler template
-│   └── assertion.xml             # Assertion template
+│       ├── jmx_validator.py      # Validate JMX
+│       ├── ptscenario_parser.py  # Parse pt_scenario.yaml
+│       ├── scenario_jmx_generator.py  # Generate JMX from scenarios
+│       ├── scenario_validator.py # Validate scenarios
+│       ├── scenario_wizard.py    # Interactive wizard
+│       ├── spec_comparator.py    # Compare OpenAPI specs
+│       ├── snapshot_manager.py   # Manage spec snapshots
+│       └── jmx_updater.py        # Update existing JMX
 ├── tests/
-│   ├── __init__.py
-│   ├── core/
-│   │   ├── test_project_analyzer.py
-│   │   ├── test_openapi_parser.py
-│   │   ├── test_jmx_generator.py
-│   │   └── test_jmx_validator.py
+│   ├── conftest.py               # Shared fixtures
+│   ├── core/                     # Core module tests
+│   ├── fixtures/                 # Test data files
 │   ├── test_cli.py
+│   ├── test_cli_integration.py
 │   ├── test_mcp_server.py
-│   └── integration/
-│       └── test_end_to_end.py
+│   ├── test_error_handling.py
+│   └── test_edge_cases.py
 ├── examples/
 │   ├── petstore/
 │   │   ├── swagger.json
@@ -488,16 +496,23 @@ app/
 │       ├── openapi.yaml
 │       └── simple-crud-test.jmx
 ├── docs/
-│   ├── IMPLEMENTATION_PLAN.md
-│   ├── ARCHITECTURE.md           # This file
-│   ├── CORE_MODULES.md
-│   └── DEVELOPMENT.md
+│   ├── PT_SCENARIO_SPEC.md
+│   ├── PT_SCENARIO_CHEATSHEET.md
+│   ├── BACKLOG.md
+│   ├── TESTING.md
+│   └── dev/
+│       ├── ARCHITECTURE.md       # This file
+│       ├── CORE_MODULES.md
+│       ├── DEVELOPMENT.md
+│       └── JMX_FORMAT_REFERENCE.md
 ├── .vscode/
 │   └── settings.json             # MCP configuration
 ├── pyproject.toml                # Project config
 ├── README.md
-├── .gitignore
-└── LICENSE
+├── QUICKSTART.md
+├── CHANGELOG.md
+├── CLAUDE.md
+└── TODO.md
 ```
 
 ## Extension Points

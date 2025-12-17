@@ -351,7 +351,9 @@ assert:
 
 ---
 
-## Condition Syntax (planned)
+## Condition Syntax (NOT YET IMPLEMENTED)
+
+> **Note:** This feature is planned but not yet implemented. The syntax below shows the intended design for future versions.
 
 Conditional step execution based on previous results.
 

@@ -7,10 +7,9 @@ This document describes the testing architecture and guidelines for the JMeter T
 The project uses pytest as the testing framework with comprehensive coverage across unit, integration, and CLI tests.
 
 **Key Statistics:**
-- 524+ tests
+- 677+ tests
 - 21 test files
-- 4.8:1 test-to-code ratio
-- 91% code coverage target
+- 82% code coverage
 
 ## Directory Structure
 

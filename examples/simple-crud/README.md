@@ -13,6 +13,7 @@ This example demonstrates JMeter Test Generator with a simple REST API using Ope
 ## Files
 
 - `openapi.yaml` - OpenAPI 3.0.3 specification
+- `pt_scenario.yaml` - Example scenario for user CRUD flow
 - `simple-crud-test.jmx` - Generated JMeter test plan
 - `README.md` - This file
 
@@ -148,7 +149,7 @@ open report/index.html
 ## Validate Generated JMX
 
 ```bash
-jmeter-gen validate simple-crud-test.jmx
+jmeter-gen validate script simple-crud-test.jmx
 ```
 
 Expected output:

@@ -56,4 +56,4 @@ Prioritized list of planned extensions for JMeter Test Generator.
 
 ---
 
-See [v2/ideas/FUTURE_IDEAS.md](v2/ideas/FUTURE_IDEAS.md) for detailed specifications.
+Future ideas and detailed specifications are tracked in GitHub issues and the project backlog.

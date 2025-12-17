@@ -5,7 +5,7 @@ Get started with JMeter Test Generator in 5 minutes.
 ## Installation
 
 ```bash
-cd app
+cd /path/to/jmeter-test-generator
 pip install -e .
 ```
 
@@ -13,7 +13,7 @@ pip install -e .
 
 ```bash
 jmeter-gen --version
-# Output: jmeter-gen, version 3.2.2
+# Output: jmeter-gen, version X.Y.Z
 ```
 
 ## Basic Usage
@@ -305,7 +305,7 @@ jmeter-gen analyze [--project-path PATH]
 
 # Generate JMX
 jmeter-gen generate [OPTIONS]
-  --spec PATH           Path to OpenAPI spec
+  --spec PATH           Path to OpenAPI spec (or URL)
   --scenario PATH       Path to pt_scenario.yaml file
   --output, -o PATH     Output JMX file
   --threads, -t INT     Number of threads (default: 1)
@@ -313,6 +313,8 @@ jmeter-gen generate [OPTIONS]
   --duration, -d INT    Test duration in seconds (default: None - iteration-based)
   --endpoints, -e TEXT  Specific endpoints to include (can be repeated)
   --base-url URL        Override base URL from spec
+  --no-scenario         Skip scenario detection, use OpenAPI-based generation
+  --insecure            Skip SSL verification when downloading spec from URL
 
 # Create new scenario (interactive wizard)
 jmeter-gen new scenario [OPTIONS]
@@ -361,7 +363,7 @@ Older versions are not supported.
 
 **Solution**: Validate the JMX first:
 ```bash
-jmeter-gen validate your-test.jmx
+jmeter-gen validate script your-test.jmx
 ```
 
 Common causes:
@@ -405,14 +407,14 @@ Or update the HTTP Request Defaults element in the generated JMX file.
 
 ## Next Steps
 
-1. Read [Scenario Specification](docs/v2/PT_SCENARIO_SPEC.md) for pt_scenario.yaml format
+1. Read [Scenario Specification](docs/PT_SCENARIO_SPEC.md) for pt_scenario.yaml format
 2. Check [examples/](examples/) for working examples
 3. Review [CHANGELOG.md](CHANGELOG.md) for version history
 
 ## Getting Help
 
 - Check the [examples/](examples/) directory for working examples
-- Read the [Development Guide](docs/DEVELOPMENT.md) for detailed documentation
+- Read the [Development Guide](docs/dev/DEVELOPMENT.md) for detailed documentation
 - Review [CHANGELOG.md](CHANGELOG.md) for version history and roadmap
 
 ## License

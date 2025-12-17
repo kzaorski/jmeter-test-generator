@@ -47,7 +47,7 @@ pip install -e ".[dev]"
 To use `jmeter-gen` from any directory without activating a virtual environment:
 
 ```bash
-cd /path/to/jmeter-test-generator/app
+cd /path/to/jmeter-test-generator
 pip install --user -e ".[dev]"
 ```
 
@@ -180,38 +180,33 @@ Both modes share the same core logic.
 - [Changelog](CHANGELOG.md) - Version history
 
 ### Feature Documentation
-- [Scenario Wizard](docs/v3/README.md) - Interactive wizard for creating scenarios
-- [Scenario Specification](docs/v2/PT_SCENARIO_SPEC.md) - pt_scenario.yaml format
-- [Scenario Testing](docs/v2/README.md) - Scenario-based test generation
+- [Scenario Specification](docs/PT_SCENARIO_SPEC.md) - pt_scenario.yaml format
+- [Scenario Cheatsheet](docs/PT_SCENARIO_CHEATSHEET.md) - Quick reference
+- [CI/CD Integration](docs/PIPELINE_INTEGRATION_PLAN.md) - Pipeline examples
 
 ### Developer Documentation
-- [Architecture](docs/v1/ARCHITECTURE.md)
-- [Development Guide](docs/v1/DEVELOPMENT.md)
-- [Core Modules](docs/v2/CORE_MODULES.md)
+- [Architecture](docs/dev/ARCHITECTURE.md)
+- [Development Guide](docs/dev/DEVELOPMENT.md)
+- [Core Modules](docs/dev/CORE_MODULES.md)
 
 ## Project Structure
 
 ```
-app/
+jmeter-test-generator/
 ├── jmeter_gen/              # Main package
 │   ├── core/                # Core logic (shared)
 │   │   ├── project_analyzer.py
 │   │   ├── openapi_parser.py
 │   │   ├── jmx_generator.py
 │   │   ├── jmx_validator.py
-│   │   ├── spec_comparator.py      # Change detection
-│   │   ├── snapshot_manager.py     # Snapshot management
-│   │   ├── jmx_updater.py          # JMX updates
 │   │   ├── ptscenario_parser.py    # Scenario parsing
-│   │   ├── correlation_analyzer.py # Auto-correlation
-│   │   ├── scenario_jmx_generator.py # Scenario JMX
-│   │   ├── scenario_visualizer.py  # Terminal visualization
-│   │   ├── scenario_mermaid.py     # Mermaid diagrams
+│   │   ├── scenario_jmx_generator.py
 │   │   └── scenario_wizard.py      # Interactive wizard
 │   ├── cli.py               # CLI interface
 │   └── mcp_server.py        # MCP Server interface
 ├── tests/                   # Unit and integration tests
 ├── docs/                    # Documentation
+├── examples/                # Example projects
 └── pyproject.toml           # Project configuration
 ```
 

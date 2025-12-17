@@ -16,7 +16,7 @@ This guide helps you set up your development environment and start contributing 
 
 ```bash
 git clone https://github.com/your-org/jmeter-test-generator.git
-cd jmeter-test-generator/app
+cd jmeter-test-generator
 ```
 
 ### 2. Create Virtual Environment
@@ -120,7 +120,7 @@ jmeter-gen generate
 ## Project Structure
 
 ```
-app/
+jmeter-test-generator/
 ├── jmeter_gen/              # Main package
 │   ├── __init__.py
 │   ├── cli.py               # CLI interface
@@ -130,14 +130,17 @@ app/
 │       ├── project_analyzer.py
 │       ├── openapi_parser.py
 │       ├── jmx_generator.py
-│       └── jmx_validator.py
-├── templates/               # JMX XML templates
+│       ├── jmx_validator.py
+│       ├── ptscenario_parser.py
+│       ├── scenario_jmx_generator.py
+│       └── scenario_wizard.py
 ├── tests/                   # Test suite
 │   ├── core/
-│   ├── integration/
-│   └── fixtures/
+│   ├── fixtures/
+│   └── *.py
 ├── examples/                # Example projects
 ├── docs/                    # Documentation
+│   └── dev/                 # Developer docs
 └── pyproject.toml           # Project config
 ```
 
@@ -151,7 +154,7 @@ git checkout -b feature/your-feature-name
 
 ### 2. Make Changes
 
-Follow the implementation plan in `docs/IMPLEMENTATION_PLAN.md`.
+Follow the module specifications in `docs/dev/CORE_MODULES.md`.
 
 ### 3. Write Tests
 
@@ -681,10 +684,9 @@ find . -type d -name __pycache__ -exec rm -rf {} +  # Clean cache
 
 ## Next Steps
 
-1. Read `IMPLEMENTATION_PLAN.md` for roadmap
-2. Read `ARCHITECTURE.md` for system design
-3. Read `CORE_MODULES.md` for module specs
-4. Pick a task from Phase 1 and start coding
-5. Test frequently with real-world API projects
+1. Read `ARCHITECTURE.md` for system design
+2. Read `CORE_MODULES.md` for module specs
+3. Check `TODO.md` for current tasks
+4. Test frequently with real-world API projects
 
 Happy coding!

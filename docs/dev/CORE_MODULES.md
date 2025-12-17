@@ -224,11 +224,11 @@ Parse OpenAPI specification file.
     "version": str,               # API version from info.version
     "base_url": str,              # Base URL (from servers or host+basePath)
     "endpoints": List[Dict],      # Parsed endpoints
-    "spec": Dict,                 # Full spec for reference
-    "spec_type": str,             # "openapi" or "swagger"
-    "spec_version": str           # "3.0.0" or "2.0"
+    "spec": Dict                  # Full spec for reference
 }
 ```
+
+Note: `spec_type` and `spec_version` are NOT returned by the parser. Use the raw `spec` dict to determine these if needed (check for `openapi` or `swagger` keys).
 
 **Algorithm**:
 1. Detect format (YAML or JSON) from file extension

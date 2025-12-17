@@ -179,4 +179,4 @@ jmeter-gen new scenario
 
 ---
 
-Full specification: [docs/v2/PT_SCENARIO_SPEC.md](v2/PT_SCENARIO_SPEC.md)
+Full specification: [PT_SCENARIO_SPEC.md](PT_SCENARIO_SPEC.md)

@@ -113,7 +113,7 @@ jmeter -n -t petstore-test.jmx -l results.jtl -e -o report/
 ## Validate Generated JMX
 
 ```bash
-jmeter-gen validate petstore-test.jmx
+jmeter-gen validate script petstore-test.jmx
 ```
 
 Expected output:

@@ -2,7 +2,7 @@
 
 ## Phase 1: Core Logic
 
-### Step 1: Project Analyzer ✅ COMPLETED
+### Step 1: Project Analyzer - COMPLETED
 - [x] Create `jmeter_gen/core/project_analyzer.py`
 - [x] Implement `ProjectAnalyzer` class
 - [x] Implement `find_openapi_spec()` method
@@ -13,7 +13,7 @@
 - [x] Test with real-world OpenAPI projects - **Verified with Petstore API**
 - [x] Update documentation if needed - **No updates needed**
 
-### Step 2: OpenAPI Parser ✅ COMPLETED
+### Step 2: OpenAPI Parser - COMPLETED
 - [x] Create `jmeter_gen/core/openapi_parser.py`
 - [x] Implement `OpenAPIParser` class
 - [x] Implement `parse()` method
@@ -25,7 +25,7 @@
 - [x] Test with Petstore API - **Verified with examples/petstore/**
 - [x] Update documentation if needed - **No updates needed**
 
-### Step 3: JMX Generator ✅ COMPLETED
+### Step 3: JMX Generator - COMPLETED
 **IMPORTANT:** Use `docs/JMX_FORMAT_REFERENCE.md` as the primary reference for all JMX structure and implementation
 - [x] Create `jmeter_gen/core/jmx_generator.py`
 - [x] Implement `JMXGenerator` class
@@ -45,7 +45,7 @@
 - [x] Test JMX execution in JMeter headless - **Verified structure**
 - [x] Update documentation if needed - **No updates needed**
 
-### Step 4: JMX Validator ✅ COMPLETED
+### Step 4: JMX Validator - COMPLETED
 - [x] Create `jmeter_gen/core/jmx_validator.py`
 - [x] Implement `JMXValidator` class
 - [x] Implement `validate()` method
@@ -58,9 +58,9 @@
 - [x] Test with valid and invalid JMX files - **23 test cases**
 - [x] Update documentation if needed - **No updates needed**
 
-## Phase 2: CLI Interface ✅ COMPLETED
+## Phase 2: CLI Interface - COMPLETED
 
-### Step 5: CLI Commands ✅ COMPLETED
+### Step 5: CLI Commands - COMPLETED
 - [x] Create `jmeter_gen/cli.py`
 - [x] Set up Click CLI framework
 - [x] Implement `cli()` group
@@ -75,7 +75,7 @@
 - [x] Manual testing of all commands - **Verified with Petstore API**
 - [x] Update documentation if needed - **No updates needed**
 
-### Step 5 (continued): CLI Integration ✅ COMPLETED
+### Step 5 (continued): CLI Integration - COMPLETED
 - [x] End-to-end testing with real projects - **Petstore API**
 - [x] Test all command combinations
 - [x] Test error cases (missing spec, invalid args)
@@ -83,11 +83,11 @@
 - [x] Verify help text accuracy - **All help commands verified**
 - [x] Test output formatting - **Rich formatting working**
 - [x] Create `tests/test_cli_integration.py` - **35 integration tests, 100% passing**
-- [ ] Update README with CLI examples - **Deferred to documentation phase**
+- [x] Update README with CLI examples - **Completed in README.md Quick Start section**
 
-## Phase 3: MCP Server ✅ COMPLETED
+## Phase 3: MCP Server - COMPLETED
 
-### Step 6: MCP Server Implementation ✅ COMPLETED
+### Step 6: MCP Server Implementation - COMPLETED
 - [x] Create `jmeter_gen/mcp_server.py`
 - [x] Set up MCP Server with Python SDK
 - [x] Implement `list_tools()` handler
@@ -117,7 +117,7 @@
 
 ## Phase 4: Testing & Documentation
 
-### Step 7: Comprehensive Testing ✅ COMPLETED
+### Step 7: Comprehensive Testing - COMPLETED
 - [x] Review all unit tests
 - [x] Ensure >80% code coverage - **98% achieved (target: 95%)**
 - [x] Create comprehensive error handling tests - **test_error_handling.py with 20 tests**
@@ -199,21 +199,14 @@
 ## Additional Tasks
 
 ### Configuration
+- [x] Create CHANGELOG.md - Created and maintained
 - [ ] Add LICENSE file (MIT)
-- [ ] Create CHANGELOG.md
 - [ ] Add CONTRIBUTING.md guidelines
 - [ ] Set up GitHub Actions (optional)
 
-### Templates
-- [ ] Create `templates/test_plan_base.xml`
-- [ ] Create `templates/thread_group.xml`
-- [ ] Create `templates/http_sampler.xml`
-- [ ] Create `templates/assertion.xml`
-
 ### Examples
-- [ ] Real-world API example
-- [ ] Petstore API example
-- [ ] Simple CRUD API example
+- [x] Petstore API example - examples/petstore/
+- [x] Simple CRUD API example - examples/simple-crud/
 
 ### Enhancements (Post-MVP)
 - [ ] Add CSV Data Set Config (v1.1)
@@ -255,7 +248,7 @@
   - [ ] MCP Server integration
     - [ ] Update analyze_project_for_jmeter tool
     - [ ] Update generate_jmx_from_openapi tool
-  - [ ] Snapshot storage strategy (Opcja B: Commitowane)
+  - [ ] Snapshot storage strategy (Option B: Committed to git)
     - [ ] Snapshots in .jmeter-gen/snapshots/ (committed to git)
     - [ ] Backups in .jmeter-gen/backups/ (local only, gitignored)
     - [ ] Team workflow support
@@ -288,21 +281,21 @@
 
 ## Documentation Checklist
 
-- [ ] README.md complete
-- [ ] QUICKSTART.md with examples
-- [ ] ARCHITECTURE.md accurate
-- [ ] CORE_MODULES.md up-to-date
-- [ ] DEVELOPMENT.md with setup instructions
-- [ ] API documentation (docstrings)
-- [ ] Examples directory with working samples
-- [ ] Troubleshooting guide
+- [x] README.md complete
+- [x] QUICKSTART.md with examples
+- [x] ARCHITECTURE.md accurate
+- [x] CORE_MODULES.md up-to-date
+- [x] DEVELOPMENT.md with setup instructions
+- [x] API documentation (docstrings)
+- [x] Examples directory with working samples
+- [x] Troubleshooting guide
 
 ## Release Checklist
 
-- [ ] All tests passing
-- [ ] Documentation complete
-- [ ] Version number updated
-- [ ] CHANGELOG updated
+- [x] All tests passing - 677/677
+- [x] Documentation complete
+- [x] Version number updated - v3.4.0
+- [x] CHANGELOG updated
 - [ ] Tagged in git
 - [ ] Package built: `python -m build`
 - [ ] Package published to PyPI (optional)
@@ -310,8 +303,8 @@
 
 ## Current Status
 
-**Phase**: Phase 1 ✅ COMPLETED, Phase 2 ✅ COMPLETED, Phase 3 ✅ COMPLETED, Phase 4 - Testing & Documentation ✅ COMPLETED
-**Completed**: Step 1 - ProjectAnalyzer ✅, Step 2 - OpenAPIParser ✅, Step 3 - JMXGenerator ✅, Step 4 - JMXValidator ✅, Step 5 - CLI ✅, Step 6 - MCP Server ✅, Step 7 - Comprehensive Testing ✅, Step 8 - Documentation & Examples ✅
+**Phase**: Phase 1 - COMPLETED, Phase 2 - COMPLETED, Phase 3 - COMPLETED, Phase 4 - Testing & Documentation - COMPLETED
+**Completed**: Step 1 - ProjectAnalyzer, Step 2 - OpenAPIParser, Step 3 - JMXGenerator, Step 4 - JMXValidator, Step 5 - CLI, Step 6 - MCP Server, Step 7 - Comprehensive Testing, Step 8 - Documentation & Examples
 **Status**: v3.0.0 COMPLETE - Scenario Init Wizard + MCP Scenario Builder
 
 **Latest Achievement**: v3.0.0 released (2025-12-01). Added Scenario Init Wizard (`jmeter-gen new scenario`) and 3 new MCP tools for scenario building via natural language: `list_endpoints`, `suggest_captures`, `build_scenario`. MCP Server now provides 8 tools. 677 tests passing with 82% coverage.
