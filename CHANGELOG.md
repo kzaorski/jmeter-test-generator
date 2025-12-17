@@ -5,6 +5,31 @@ All notable changes to the JMeter Test Generator project will be documented in t
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.4.0] - 2025-12-17
+
+### Added
+- **CI/CD Integration Features** - New options for pipeline usage (Azure DevOps, GitHub Actions, etc.)
+  - `--scenario PATH` flag for explicit scenario file path (overrides auto-discovery)
+  - `--spec URL` support to download OpenAPI spec from HTTP/HTTPS URLs
+  - `--insecure` flag to skip SSL verification when downloading spec from URL
+  - Auto-detect CI environment (CI, TF_BUILD, GITHUB_ACTIONS, GITLAB_CI, etc.)
+  - Plain text output without colors when CI environment detected
+- New helper functions in CLI module
+  - `_is_ci_environment()` - Detect CI environment variables
+  - `_resolve_spec_path()` - Download spec from URL if needed
+- 9 new tests for CI integration features
+
+### Changed
+- `--spec` option now accepts both file paths and URLs
+- Console output automatically adapts to CI environment (no colors, no interactive prompts)
+
+### Documentation
+- Added "CI/CD Integration" section to README.md with pipeline examples
+- Added "CI/CD Integration" section to CLAUDE.md
+- New `docs/PIPELINE_INTEGRATION_PLAN.md` with implementation details
+
+---
+
 ## [3.3.0] - 2025-12-16
 
 ### Added
