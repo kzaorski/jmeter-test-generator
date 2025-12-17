@@ -3,31 +3,65 @@
 ## System Overview
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                      User Interfaces                        │
-│                                                             │
-│  ┌──────────────────┐           ┌──────────────────┐       │
-│  │   CLI Mode       │           │   MCP Mode       │       │
-│  │  (Terminal)      │           │  (Copilot)       │       │
-│  └────────┬─────────┘           └────────┬─────────┘       │
-│           │                              │                  │
-│           └──────────┬───────────────────┘                  │
-│                      │                                      │
-└──────────────────────┼──────────────────────────────────────┘
-                       │
-                       ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    Core Logic (Shared)                      │
-│                                                             │
-│  ┌────────────────┐  ┌────────────────┐  ┌──────────────┐ │
-│  │ Project        │  │ OpenAPI        │  │ JMX          │ │
-│  │ Analyzer       │→ │ Parser         │→ │ Generator    │ │
-│  └────────────────┘  └────────────────┘  └──────────────┘ │
-│                                                    │        │
-│                                          ┌─────────▼──────┐ │
-│                                          │ JMX Validator  │ │
-│                                          └────────────────┘ │
-└─────────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────────────────────┐
+│                            User Interfaces                                    │
+│                                                                               │
+│  ┌──────────────────────┐                 ┌──────────────────────┐           │
+│  │     CLI Mode         │                 │     MCP Mode         │           │
+│  │    (Terminal)        │                 │    (Copilot)         │           │
+│  └──────────┬───────────┘                 └──────────┬───────────┘           │
+│             │                                        │                        │
+│             └────────────────┬───────────────────────┘                        │
+│                              │                                                │
+└──────────────────────────────┼────────────────────────────────────────────────┘
+                               │
+                               ▼
+┌───────────────────────────────────────────────────────────────────────────────┐
+│                          Core Logic (Shared)                                  │
+│                                                                               │
+│  ┌─────────────────────────────────────────────────────────────────────────┐ │
+│  │                      Base Modules (v1.0)                                │ │
+│  │                                                                         │ │
+│  │  ┌────────────────┐  ┌────────────────┐  ┌────────────────┐           │ │
+│  │  │ Project        │  │ OpenAPI        │  │ JMX            │           │ │
+│  │  │ Analyzer       │→ │ Parser         │→ │ Generator      │           │ │
+│  │  └────────────────┘  └────────────────┘  └───────┬────────┘           │ │
+│  │                                                   │                    │ │
+│  │                                         ┌─────────▼────────┐           │ │
+│  │                                         │ JMX Validator    │           │ │
+│  │                                         └──────────────────┘           │ │
+│  └─────────────────────────────────────────────────────────────────────────┘ │
+│                                                                               │
+│  ┌─────────────────────────────────────────────────────────────────────────┐ │
+│  │                   Change Detection Modules (v1.1)                       │ │
+│  │                                                                         │ │
+│  │  ┌────────────────┐  ┌────────────────┐  ┌────────────────┐           │ │
+│  │  │ Spec           │  │ Snapshot       │  │ JMX            │           │ │
+│  │  │ Comparator     │→ │ Manager        │→ │ Updater        │           │ │
+│  │  └────────────────┘  └────────────────┘  └────────────────┘           │ │
+│  └─────────────────────────────────────────────────────────────────────────┘ │
+│                                                                               │
+│  ┌─────────────────────────────────────────────────────────────────────────┐ │
+│  │                    Scenario Modules (v2.0/v3.0)                         │ │
+│  │                                                                         │ │
+│  │  ┌────────────────┐  ┌────────────────┐  ┌────────────────┐           │ │
+│  │  │ PtScenario     │  │ Correlation    │  │ Scenario JMX   │           │ │
+│  │  │ Parser         │→ │ Analyzer       │→ │ Generator      │           │ │
+│  │  └───────┬────────┘  └────────────────┘  └────────────────┘           │ │
+│  │          │                                                             │ │
+│  │          ▼                                                             │ │
+│  │  ┌────────────────┐  ┌────────────────┐  ┌────────────────┐           │ │
+│  │  │ Scenario       │  │ Scenario       │  │ Scenario       │           │ │
+│  │  │ Validator      │  │ Visualizer     │  │ Mermaid        │           │ │
+│  │  └────────────────┘  └────────────────┘  └────────────────┘           │ │
+│  │                                                                        │ │
+│  │  ┌────────────────┐                                                   │ │
+│  │  │ Scenario       │  (v3.0 - Interactive Wizard)                      │ │
+│  │  │ Wizard         │                                                   │ │
+│  │  └────────────────┘                                                   │ │
+│  └─────────────────────────────────────────────────────────────────────────┘ │
+│                                                                               │
+└───────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Design Principles
@@ -419,19 +453,61 @@ jmx_path = "performance-test.jmx"
 ## Module Dependencies
 
 ```
-CLI ────────┐
-            ├──→ ProjectAnalyzer ──→ OpenAPIParser ──→ JMXGenerator ──→ JMXValidator
-MCP Server ─┘
+                              ┌─────────────────────────────────────────────────────────┐
+                              │                    Core Modules                         │
+                              │                                                         │
+CLI ────────┐                 │  Base Flow (v1.0):                                     │
+            │                 │  ProjectAnalyzer → OpenAPIParser → JMXGenerator        │
+            │                 │                                          ↓              │
+            │                 │                                    JMXValidator         │
+            ├──→──────────────┤                                                         │
+            │                 │  Change Detection (v1.1):                              │
+            │                 │  SpecComparator → SnapshotManager → JMXUpdater         │
+            │                 │                                                         │
+MCP Server ─┘                 │  Scenario Flow (v2.0/v3.0):                            │
+                              │  PtScenarioParser ──┬──→ ScenarioValidator             │
+                              │         ↓           │                                   │
+                              │  CorrelationAnalyzer│                                   │
+                              │         ↓           │                                   │
+                              │  ScenarioJMXGenerator                                   │
+                              │                     │                                   │
+                              │  ScenarioVisualizer ←──┘                               │
+                              │         ↓                                               │
+                              │  ScenarioMermaid                                        │
+                              │                                                         │
+                              │  ScenarioWizard (v3.0) - standalone, uses OpenAPIParser │
+                              └─────────────────────────────────────────────────────────┘
 
 Legend:
-──→ depends on
+→  depends on / data flows to
 ```
+
+**All Core Modules** (14 total):
+
+| Module | File | Purpose | Version |
+|--------|------|---------|---------|
+| ProjectAnalyzer | `project_analyzer.py` | Find OpenAPI specs in project | v1.0 |
+| OpenAPIParser | `openapi_parser.py` | Parse OpenAPI/Swagger specs | v1.0 |
+| JMXGenerator | `jmx_generator.py` | Generate JMX from spec | v1.0 |
+| JMXValidator | `jmx_validator.py` | Validate JMX structure | v1.0 |
+| SpecComparator | `spec_comparator.py` | Compare OpenAPI specs | v1.1 |
+| SnapshotManager | `snapshot_manager.py` | Manage spec snapshots | v1.1 |
+| JMXUpdater | `jmx_updater.py` | Update existing JMX files | v1.1 |
+| PtScenarioParser | `ptscenario_parser.py` | Parse pt_scenario.yaml | v2.0 |
+| CorrelationAnalyzer | `correlation_analyzer.py` | Auto-detect JSONPath for captures | v2.0 |
+| ScenarioJMXGenerator | `scenario_jmx_generator.py` | Generate JMX from scenarios | v2.0 |
+| ScenarioValidator | `scenario_validator.py` | Validate scenarios against spec | v2.0 |
+| ScenarioVisualizer | `scenario_visualizer.py` | Rich terminal visualization | v2.0 |
+| ScenarioMermaid | `scenario_mermaid.py` | Generate Mermaid diagrams | v2.0 |
+| ScenarioWizard | `scenario_wizard.py` | Interactive scenario creation | v3.0 |
 
 **Dependency Rules**:
 1. CLI and MCP do NOT depend on each other
 2. Core modules do NOT depend on CLI or MCP
 3. Core modules have minimal dependencies between them
 4. Each module can be tested independently
+5. Scenario modules depend on OpenAPIParser for spec data
+6. Change detection modules work independently of scenario modules
 
 ## Technology Stack
 
