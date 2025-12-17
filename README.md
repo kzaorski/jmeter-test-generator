@@ -130,6 +130,39 @@ Example prompts in Copilot:
 "Build a scenario with login, create item, and logout steps"
 ```
 
+### CI/CD Integration
+
+Use jmeter-gen in pipelines (Azure DevOps, GitHub Actions, etc.):
+
+```bash
+# Generate JMX from URL with explicit scenario file
+jmeter-gen generate \
+  --spec https://api.example.com/swagger.json \
+  --scenario ./scenarios/login-flow.yaml \
+  --output ./tests/performance.jmx \
+  --base-url https://api.example.com \
+  --insecure  # skip SSL verification if needed
+```
+
+**CI-friendly features (v3.4.0+):**
+- `--spec URL` - Download spec from HTTP/HTTPS URL
+- `--scenario PATH` - Explicit scenario file (no auto-discovery)
+- `--insecure` - Skip SSL verification for spec download
+- Auto-detect CI environment (CI, TF_BUILD, GITHUB_ACTIONS, etc.)
+- Plain text output without colors when CI detected
+
+**Azure DevOps example:**
+```yaml
+- script: |
+    pip install jmeter-test-generator
+    jmeter-gen generate \
+      --spec $(SWAGGER_URL) \
+      --scenario pipeline/loadtest/pt_scenario.yaml \
+      --output $(Build.ArtifactStagingDirectory)/test.jmx \
+      --base-url $(API_BASE_URL)
+  displayName: 'Generate JMeter test plan'
+```
+
 ## Architecture
 
 ```

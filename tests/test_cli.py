@@ -59,7 +59,7 @@ class TestCLI:
         result = runner.invoke(cli, ["--version"])
 
         assert result.exit_code == 0
-        assert "3.2.2" in result.output
+        assert "3.4.0" in result.output
 
 
 class TestAnalyzeCommand:
@@ -1657,3 +1657,188 @@ class TestAnalyzeGenerationOptions:
         # When option 2 is selected, generate should be called with no_scenario
         # and find_scenario_file should NOT be called again during generate
         # (it's skipped due to no_scenario=True)
+
+
+class TestCIIntegration:
+    """Tests for CI/CD integration features (v3.4.0)."""
+
+    @pytest.fixture
+    def runner(self) -> CliRunner:
+        """Create a Click CLI runner for testing."""
+        return CliRunner()
+
+    @pytest.fixture
+    def mock_spec_data(self) -> dict:
+        """Create mock OpenAPI spec data."""
+        return {
+            "title": "Test API",
+            "base_url": "http://localhost:8080",
+            "endpoints": [
+                {"path": "/api/test", "method": "GET", "operationId": "getTest"}
+            ],
+        }
+
+    @pytest.fixture(autouse=True)
+    def mock_jmx_validator(self):
+        """Mock JMXValidator for all generate tests."""
+        with patch("jmeter_gen.cli.JMXValidator") as mock_validator_class:
+            mock_validator = Mock()
+            mock_validator_class.return_value = mock_validator
+            mock_validator.validate.return_value = {"valid": True, "issues": [], "recommendations": []}
+            yield mock_validator_class
+
+    def test_is_ci_environment_with_ci_var(self):
+        """Test CI environment detection with CI=1."""
+        from jmeter_gen.cli import _is_ci_environment
+        with patch.dict("os.environ", {"CI": "1"}):
+            assert _is_ci_environment() is True
+
+    def test_is_ci_environment_with_github_actions(self):
+        """Test CI environment detection with GITHUB_ACTIONS."""
+        from jmeter_gen.cli import _is_ci_environment
+        with patch.dict("os.environ", {"GITHUB_ACTIONS": "true"}, clear=True):
+            assert _is_ci_environment() is True
+
+    def test_is_ci_environment_with_azure_devops(self):
+        """Test CI environment detection with TF_BUILD (Azure DevOps)."""
+        from jmeter_gen.cli import _is_ci_environment
+        with patch.dict("os.environ", {"TF_BUILD": "True"}, clear=True):
+            assert _is_ci_environment() is True
+
+    def test_is_ci_environment_without_ci_vars(self):
+        """Test CI environment detection without CI variables."""
+        from jmeter_gen.cli import _is_ci_environment
+        with patch.dict("os.environ", {}, clear=True):
+            assert _is_ci_environment() is False
+
+    def test_resolve_spec_path_local_file(self):
+        """Test _resolve_spec_path with local file path."""
+        from jmeter_gen.cli import _resolve_spec_path
+        result = _resolve_spec_path("/path/to/openapi.yaml")
+        assert result == "/path/to/openapi.yaml"
+
+    @patch("jmeter_gen.cli.httpx.Client")
+    def test_resolve_spec_path_url(self, mock_client_class):
+        """Test _resolve_spec_path with HTTP URL."""
+        from jmeter_gen.cli import _resolve_spec_path
+
+        mock_client = Mock()
+        mock_client_class.return_value.__enter__ = Mock(return_value=mock_client)
+        mock_client_class.return_value.__exit__ = Mock(return_value=False)
+
+        mock_response = Mock()
+        mock_response.content = b'{"openapi": "3.0.0"}'
+        mock_response.raise_for_status = Mock()
+        mock_client.get.return_value = mock_response
+
+        result = _resolve_spec_path("https://api.example.com/swagger.json")
+
+        assert result.endswith(".json")
+        mock_client.get.assert_called_once_with("https://api.example.com/swagger.json")
+
+    @patch("jmeter_gen.cli.httpx.Client")
+    def test_resolve_spec_path_url_yaml(self, mock_client_class):
+        """Test _resolve_spec_path with YAML URL."""
+        from jmeter_gen.cli import _resolve_spec_path
+
+        mock_client = Mock()
+        mock_client_class.return_value.__enter__ = Mock(return_value=mock_client)
+        mock_client_class.return_value.__exit__ = Mock(return_value=False)
+
+        mock_response = Mock()
+        mock_response.content = b'openapi: "3.0.0"'
+        mock_response.raise_for_status = Mock()
+        mock_client.get.return_value = mock_response
+
+        result = _resolve_spec_path("https://api.example.com/openapi.yaml")
+
+        assert result.endswith(".yaml")
+
+    @patch("jmeter_gen.cli.JMXGenerator")
+    @patch("jmeter_gen.cli.OpenAPIParser")
+    @patch("jmeter_gen.cli.ProjectAnalyzer")
+    @patch("jmeter_gen.cli.PtScenarioParser")
+    @patch("jmeter_gen.cli.CorrelationAnalyzer")
+    @patch("jmeter_gen.cli.ScenarioVisualizer")
+    @patch("jmeter_gen.cli.ScenarioJMXGenerator")
+    def test_generate_with_scenario_flag(
+        self,
+        mock_scenario_generator_class: Mock,
+        mock_visualizer_class: Mock,
+        mock_correlation_class: Mock,
+        mock_scenario_parser_class: Mock,
+        mock_analyzer_class: Mock,
+        mock_parser_class: Mock,
+        mock_generator_class: Mock,
+        runner: CliRunner,
+        tmp_path: Path,
+        mock_spec_data: dict,
+    ):
+        """Test generate with explicit --scenario flag."""
+        spec_file = tmp_path / "openapi.yaml"
+        spec_file.write_text("openapi: 3.0.0")
+        scenario_file = tmp_path / "scenarios" / "login.yaml"
+        scenario_file.parent.mkdir(parents=True, exist_ok=True)
+        scenario_file.write_text("name: Login\nscenario:\n  - endpoint: POST /login")
+        output_file = tmp_path / "test.jmx"
+
+        mock_analyzer = Mock()
+        mock_analyzer_class.return_value = mock_analyzer
+        mock_analyzer.find_scenario_file.return_value = None  # No auto-discovery
+
+        mock_parser = Mock()
+        mock_parser_class.return_value = mock_parser
+        mock_parser.parse.return_value = mock_spec_data
+
+        mock_scenario_parser = Mock()
+        mock_scenario_parser_class.return_value = mock_scenario_parser
+        mock_scenario = Mock()
+        mock_scenario.name = "Login"
+        mock_scenario.settings = Mock()
+        mock_scenario.settings.base_url = None
+        mock_scenario_parser.parse.return_value = mock_scenario
+
+        mock_correlation = Mock()
+        mock_correlation_class.return_value = mock_correlation
+        mock_correlation.analyze.return_value = Mock()
+
+        mock_visualizer = Mock()
+        mock_visualizer_class.return_value = mock_visualizer
+
+        mock_scenario_generator = Mock()
+        mock_scenario_generator_class.return_value = mock_scenario_generator
+        mock_scenario_generator.generate.return_value = {
+            "success": True,
+            "jmx_path": str(output_file),
+            "samplers_created": 1,
+            "extractors_created": 0,
+            "assertions_created": 1,
+            "correlation_warnings": [],
+            "correlation_errors": [],
+        }
+
+        result = runner.invoke(
+            generate,
+            [
+                "--spec", str(spec_file),
+                "--scenario", str(scenario_file),
+                "--output", str(output_file),
+                "--base-url", "http://localhost:8080",
+            ],
+        )
+
+        assert result.exit_code == 0
+        # Verify scenario parser was called with explicit scenario file
+        mock_scenario_parser.parse.assert_called_once_with(str(scenario_file))
+        # Verify auto-discovery was NOT called (because --scenario was provided)
+        mock_analyzer.find_scenario_file.assert_not_called()
+
+    def test_generate_help_shows_new_flags(self, runner: CliRunner):
+        """Test that generate --help shows new CI integration flags."""
+        result = runner.invoke(generate, ["--help"])
+
+        assert result.exit_code == 0
+        assert "--scenario" in result.output
+        assert "--insecure" in result.output
+        assert "Path to pt_scenario.yaml" in result.output
+        assert "Skip SSL verification" in result.output

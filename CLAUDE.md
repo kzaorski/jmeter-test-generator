@@ -72,6 +72,26 @@ jmeter-gen new scenario
 jmeter-gen new scenario --spec openapi.yaml --output my_scenario.yaml
 ```
 
+### CI/CD Integration (v3.4.0+)
+```bash
+# Generate from URL with explicit scenario
+jmeter-gen generate \
+  --spec https://api.example.com/swagger.json \
+  --scenario ./scenarios/pt_scenario.yaml \
+  --output test.jmx \
+  --base-url https://api.example.com \
+  --insecure
+
+# CI-friendly flags:
+# --spec URL       Download spec from HTTP/HTTPS
+# --scenario PATH  Explicit scenario file (skip auto-discovery)
+# --insecure       Skip SSL verification for URL download
+
+# CI environment auto-detection:
+# When CI=1, TF_BUILD, GITHUB_ACTIONS etc. are set,
+# jmeter-gen automatically disables colors and prompts
+```
+
 ### Testing with Example Projects
 ```bash
 # Example test project (Petstore API)

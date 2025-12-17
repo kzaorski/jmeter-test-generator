@@ -7,12 +7,15 @@ Supports change detection (enabled by default), --auto-update options.
 """
 
 import json
+import os
 import re
 import sys
+import tempfile
 from pathlib import Path
 from typing import Optional, Tuple
 
 import click
+import httpx
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
@@ -36,7 +39,65 @@ from jmeter_gen.core.scenario_validator import ScenarioValidator
 # v3 imports
 from jmeter_gen.core.scenario_wizard import ScenarioWizard
 
-console = Console()
+
+def _is_ci_environment() -> bool:
+    """Detect if running in CI environment.
+
+    Returns:
+        True if CI environment detected, False otherwise.
+    """
+    ci_vars = [
+        "CI",
+        "GITHUB_ACTIONS",
+        "GITLAB_CI",
+        "JENKINS_URL",
+        "TF_BUILD",  # Azure DevOps
+        "BUILDKITE",
+        "CIRCLECI",
+        "TRAVIS",
+    ]
+    return any(os.environ.get(var) for var in ci_vars)
+
+
+def _resolve_spec_path(spec: str, insecure: bool = False) -> str:
+    """Resolve spec path - download if URL, return as-is if local file.
+
+    Args:
+        spec: Path to local file or HTTP/HTTPS URL.
+        insecure: Skip SSL verification when downloading.
+
+    Returns:
+        Path to local file (original or downloaded).
+
+    Raises:
+        click.ClickException: If download fails.
+    """
+    if spec.startswith(("http://", "https://")):
+        try:
+            with httpx.Client(verify=not insecure, timeout=60.0) as client:
+                response = client.get(spec)
+                response.raise_for_status()
+
+            # Determine suffix from URL or content type
+            suffix = ".json"
+            if spec.endswith(".yaml") or spec.endswith(".yml"):
+                suffix = ".yaml"
+
+            fd, tmp_path = tempfile.mkstemp(suffix=suffix)
+            os.close(fd)
+            with open(tmp_path, "wb") as f:
+                f.write(response.content)
+            return tmp_path
+        except httpx.HTTPError as e:
+            raise click.ClickException(f"Failed to download spec from URL: {e}")
+    return spec
+
+
+# Configure console based on CI environment
+if _is_ci_environment():
+    console = Console(force_terminal=False, no_color=True, highlight=False)
+else:
+    console = Console()
 
 
 def _get_spec_status(spec_path: str) -> str:
@@ -83,7 +144,7 @@ def _get_spec_status(spec_path: str) -> str:
 
 
 @click.group()
-@click.version_option(version="3.2.2", prog_name="jmeter-gen")
+@click.version_option(version="3.4.0", prog_name="jmeter-gen")
 def cli():
     """JMeter Test Generator - Generate JMX test plans from OpenAPI specifications.
 
@@ -340,8 +401,14 @@ def _display_change_detection_results(result: dict, show_details: bool) -> None:
 @cli.command()
 @click.option(
     "--spec",
-    help="Path to OpenAPI specification file (YAML or JSON)",
-    type=click.Path(exists=True),
+    help="Path or URL to OpenAPI specification file (YAML or JSON)",
+    type=str,
+)
+@click.option(
+    "--insecure",
+    is_flag=True,
+    default=False,
+    help="Skip SSL verification when downloading spec from URL",
 )
 @click.option(
     "--output",
@@ -396,8 +463,15 @@ def _display_change_detection_results(result: dict, show_details: bool) -> None:
     is_flag=True,
     help="Skip scenario file, use OpenAPI-based generation",
 )
+@click.option(
+    "--scenario",
+    type=click.Path(exists=True),
+    default=None,
+    help="Path to pt_scenario.yaml file (overrides auto-discovery)",
+)
 def generate(
     spec: Optional[str],
+    insecure: bool,
     output: Optional[str],
     threads: int,
     rampup: int,
@@ -408,6 +482,7 @@ def generate(
     force_new: bool,
     no_snapshot: bool,
     no_scenario: bool,
+    scenario: Optional[str],
 ):
     """Generate JMeter JMX test plan from OpenAPI specification.
 
@@ -418,11 +493,14 @@ def generate(
     directory) and generates filename from API title.
 
     Supports --auto-update to update existing JMX when spec changes.
+    Supports downloading spec from URL (use --insecure to skip SSL verification).
 
     Example:
         jmeter-gen generate                           # Prompts for output folder
         jmeter-gen generate --output ./tests/api.jmx  # Skips folder prompt
         jmeter-gen generate --spec openapi.yaml --output my-test.jmx
+        jmeter-gen generate --spec https://api.example.com/swagger.json --output test.jmx
+        jmeter-gen generate --spec https://api.example.com/swagger.json --insecure
         jmeter-gen generate --threads 50 --rampup 10 --duration 300
         jmeter-gen generate --base-url http://staging.example.com
         jmeter-gen generate --endpoints getUsers --endpoints createUser
@@ -479,10 +557,18 @@ def generate(
 
             console.print(f"[green]✓[/green] Using spec: {spec}\n")
 
+        # Resolve spec path (download if URL)
+        spec = _resolve_spec_path(spec, insecure=insecure)
+
         # v2: Check for scenario file (unless --no-scenario)
         scenario_path = None
         if not no_scenario:
-            scenario_path = analyzer.find_scenario_file("." if not spec else str(Path(spec).parent))
+            if scenario:
+                # Explicit --scenario flag provided
+                scenario_path = scenario
+            else:
+                # Auto-discovery in spec directory
+                scenario_path = analyzer.find_scenario_file("." if not spec else str(Path(spec).parent))
         if scenario_path:
             console.print(f"[bold magenta]Scenario file found:[/bold magenta] {scenario_path}")
             console.print("[dim]Using scenario-based generation (v2)[/dim]\n")
@@ -493,19 +579,19 @@ def generate(
 
             # Parse scenario
             scenario_parser = PtScenarioParser()
-            scenario = scenario_parser.parse(scenario_path)
+            scenario_data = scenario_parser.parse(scenario_path)
 
             # Run correlation analysis
             correlation_analyzer = CorrelationAnalyzer(parser)
-            correlation_result = correlation_analyzer.analyze(scenario)
+            correlation_result = correlation_analyzer.analyze(scenario_data)
 
             # Visualize scenario
             visualizer = ScenarioVisualizer(console)
-            visualizer.visualize(scenario, correlation_result)
+            visualizer.visualize(scenario_data, correlation_result)
 
             # Generate default output if not provided
             if not output:
-                safe_name = re.sub(r'[^\w\s-]', '', scenario.name.lower())
+                safe_name = re.sub(r'[^\w\s-]', '', scenario_data.name.lower())
                 safe_name = re.sub(r'[\s_-]+', '-', safe_name).strip('-')
                 default_filename = f"{safe_name}-scenario.jmx" if safe_name else "scenario-test.jmx"
 
@@ -522,7 +608,7 @@ def generate(
             # Prompt for base URL if not provided
             final_base_url = base_url
             if not final_base_url:
-                default_url = scenario.settings.base_url or spec_data.get("base_url", "http://localhost:8080")
+                default_url = scenario_data.settings.base_url or spec_data.get("base_url", "http://localhost:8080")
                 console.print(f"\n[bold]Base URL Configuration[/bold]")
                 console.print(f"Default: [cyan]{default_url}[/cyan]")
                 user_input = console.input("\nEnter base URL (press Enter for default): ").strip()
@@ -532,7 +618,7 @@ def generate(
             console.print(f"\n[bold]Generating scenario JMX:[/bold] {output}")
             scenario_generator = ScenarioJMXGenerator(parser)
             result = scenario_generator.generate(
-                scenario=scenario,
+                scenario=scenario_data,
                 output_path=output,
                 base_url=final_base_url,
                 correlation_result=correlation_result,
