@@ -1,6 +1,6 @@
 """JMeter Test Generator - Generate JMX files from OpenAPI specs."""
 
-__version__ = "3.3.0"
+__version__ = "3.4.0"
 __author__ = "Krzysztof Zaorski"
 __email__ = "zaorski+git@gmail.com"
 

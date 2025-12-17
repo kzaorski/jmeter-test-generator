@@ -175,16 +175,16 @@ Output (formatted response)
 ## Implementation Status
 
 ### Completed
-- **Phase 1: Core Logic** ✅ COMPLETED
+- **Phase 1: Core Logic** - COMPLETED
   - ProjectAnalyzer (90% coverage)
   - OpenAPIParser (100% coverage, Swagger 2.0 + OpenAPI 3.0.x)
   - JMXGenerator (98% coverage, HTTP Request Defaults pattern)
   - JMXValidator (100% coverage)
-- **Phase 2: CLI Interface** ✅ COMPLETED
+- **Phase 2: CLI Interface** - COMPLETED
   - CLI commands: analyze, generate, validate, mcp (94% coverage)
   - Rich formatting, error handling, interactive prompts
-- **Phase 3: MCP Server** ✅ COMPLETED
-  - MCP Server with 9 tools (78% coverage)
+- **Phase 3: MCP Server** - COMPLETED
+  - MCP Server with 9 tools
   - `analyze_project_for_jmeter`: project_path, detect_changes, jmx_path, **scenario detection**
   - `generate_jmx_from_openapi`: spec_path, output_path, threads, rampup, duration, base_url_override, endpoints, auto_update, force_new, no_snapshot
   - `generate_scenario_jmx`: scenario_path, spec_path, output_path, base_url_override, **auto-filename**
@@ -196,22 +196,22 @@ Output (formatted response)
   - `validate_scenario`: **NEW** scenario_path, spec_path - validates pt_scenario.yaml before generation
   - Full async/await implementation
   - Integrated validation workflow
-- **Change Detection Modules** ✅ COMPLETED
+- **Change Detection Modules** - COMPLETED
   - SpecComparator (96% coverage) - Compare specs, detect changes
   - SnapshotManager (93% coverage) - Save/load snapshots, filter sensitive data
   - JMXUpdater (82% coverage) - Update existing JMX files
   - CLI extensions: change detection (default), --auto-update, --export-diff
 - **v1.1.0 Multi-Spec Support** - find_all_openapi_specs(), interactive selection
-- **v2.0.0 Scenario-Based Testing** ✅ COMPLETED
+- **v2.0.0 Scenario-Based Testing** - COMPLETED
   - PtScenarioParser, CorrelationAnalyzer, ScenarioJMXGenerator, ScenarioVisualizer
   - ScenarioMermaid module for diagram generation
   - Full MCP integration with 5 tools
-- **v3.0.0 Scenario Init Wizard** ✅ COMPLETED
+- **v3.0.0 Scenario Init Wizard** - COMPLETED
   - ScenarioWizard interactive CLI wizard
   - `jmeter-gen new scenario` command
   - Auto-detect OpenAPI spec, smart capture suggestions
   - Loop and think time support
-- **Overall**: 712 tests passing, 74% code coverage
+- **Overall**: 677+ tests passing, 82% code coverage
 - Project structure and configuration (pyproject.toml)
 - Package initialization files
 - Comprehensive documentation (23 docs in docs/)
@@ -509,15 +509,10 @@ Note: `spec_type` and `spec_version` are NOT returned by the parser. Use the raw
 
 Version 2 introduces scenario-based test generation using `pt_scenario.yaml` files. This enables sequential test flows with variable capture and correlation.
 
-### v2 Documentation
-All v2 specifications are in `docs/v2/`:
-- **README.md**: Overview and quick start
-- **VISION.md**: Product vision and goals
-- **PT_SCENARIO_SPEC.md**: Complete pt_scenario.yaml specification
-- **CORE_MODULES.md**: Module specifications including CorrelationAnalyzer
-- **ARCHITECTURE.md**: v2 system architecture
-- **IMPLEMENTATION_PLAN.md**: 10-step implementation plan
-- **FEASIBILITY_ANALYSIS.md**: Technical feasibility assessment
+### Scenario Documentation
+- **docs/PT_SCENARIO_SPEC.md**: Complete pt_scenario.yaml specification
+- **docs/PT_SCENARIO_CHEATSHEET.md**: Quick reference for scenarios
+- **docs/dev/CORE_MODULES.md**: Module specifications including CorrelationAnalyzer
 
 ### v2 Core Modules (new in v2.0.0)
 1. **PtScenarioParser** (`ptscenario_parser.py`): Parse and validate pt_scenario.yaml
@@ -587,8 +582,12 @@ endpoint: "createUser"
 endpoint: "GET /users/{userId}"
 ```
 
-### v1 Documentation
-Legacy v1 documentation moved to `docs/v1/`.
+### Developer Documentation
+All developer documentation is in `docs/dev/`:
+- **ARCHITECTURE.md**: System design and component architecture
+- **CORE_MODULES.md**: Detailed module specifications
+- **DEVELOPMENT.md**: Environment setup and workflows
+- **JMX_FORMAT_REFERENCE.md**: JMX file format reference
 
 ## v3.0.0 Scenario Init Wizard
 
@@ -609,24 +608,19 @@ jmeter-gen new scenario [--spec PATH] [--output NAME]
 - Live preview after each step
 - YAML output generation
 
-### v3 Documentation
-All v3 specifications in `docs/v3/`:
-- **README.md**: Overview, features, user flow
-- **CORE_MODULES.md**: ScenarioWizard class specification
-- **IMPLEMENTATION_PLAN.md**: 12-step implementation plan
-
 ## Documentation References
 
-All detailed specifications in `docs/v1/` (v1), `docs/v2/` (v2), and `docs/v3/` (v3):
-- **IMPLEMENTATION_PLAN.md**: Timeline, phases, deliverables, success criteria
-- **ARCHITECTURE.md**: System design, component architecture, data flow
-- **CORE_MODULES.md**: Detailed specifications for all 4 core modules
-- **DEVELOPMENT.md**: Environment setup, workflows, debugging, troubleshooting
-- **JMX_FORMAT_REFERENCE.md**: Comprehensive JMX file format specification - **MUST USE for Step 3 (JMX Generator implementation)**
+All detailed specifications are in `docs/` and `docs/dev/`:
+- **docs/PT_SCENARIO_SPEC.md**: Complete pt_scenario.yaml specification
+- **docs/PT_SCENARIO_CHEATSHEET.md**: Quick reference for scenarios
+- **docs/dev/ARCHITECTURE.md**: System design, component architecture, data flow
+- **docs/dev/CORE_MODULES.md**: Detailed specifications for all core modules
+- **docs/dev/DEVELOPMENT.md**: Environment setup, workflows, debugging, troubleshooting
+- **docs/dev/JMX_FORMAT_REFERENCE.md**: Comprehensive JMX file format specification
 
-Always consult CORE_MODULES.md when implementing core logic for method signatures, algorithms, and expected behavior.
+Always consult docs/dev/CORE_MODULES.md when implementing core logic for method signatures, algorithms, and expected behavior.
 
-**CRITICAL for Step 3:** When implementing the JMX Generator, you MUST reference `docs/JMX_FORMAT_REFERENCE.md` for:
+**CRITICAL for Step 3:** When implementing the JMX Generator, you MUST reference `docs/dev/JMX_FORMAT_REFERENCE.md` for:
 - Complete JMX XML structure and hierarchy
 - All property types (stringProp, boolProp, intProp, elementProp, collectionProp)
 - HTTPSampler configuration with all required properties

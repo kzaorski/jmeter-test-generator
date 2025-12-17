@@ -37,23 +37,9 @@ pip install nuitka ordered-set zstandard
 
 ## Build Process
 
-### Using Build Script (Recommended)
+### Folder Mode (Recommended)
 
-```bash
-# Standard build (folder mode - faster startup)
-python build_exe.py
-
-# Single file mode (slower startup, easier distribution)
-python build_exe.py --onefile
-
-# Clean previous builds first
-python build_exe.py --clean
-
-# Clean only (no build)
-python build_exe.py --clean-only
-```
-
-### Direct Nuitka Command
+Folder mode produces faster startup times and is recommended for most use cases.
 
 ```bash
 python -m nuitka \
@@ -64,6 +50,28 @@ python -m nuitka \
     --enable-plugin=anti-bloat \
     --windows-console-mode=force \
     jmeter_gen/cli_standalone.py
+```
+
+### Onefile Mode
+
+Single file mode is easier to distribute but has slower startup.
+
+```bash
+python -m nuitka \
+    --onefile \
+    --output-dir=dist \
+    --output-filename=jmeter-gen \
+    --include-package=jmeter_gen.core \
+    --enable-plugin=anti-bloat \
+    --windows-console-mode=force \
+    jmeter_gen/cli_standalone.py
+```
+
+### Clean Previous Builds
+
+```bash
+# Remove build artifacts before rebuilding
+rm -rf dist/ build/ *.build/
 ```
 
 ## Output
@@ -113,8 +121,8 @@ Copy only `jmeter-gen.exe`. The executable is self-contained.
 |---------|-------------|
 | `analyze` | Find OpenAPI specs in project |
 | `generate` | Generate JMX from spec |
-| `validate script` | Validate JMX file |
-| `validate scenario` | Validate scenario file |
+| `validate script FILE` | Validate JMX file |
+| `validate scenario FILE` | Validate scenario file |
 | `new scenario` | Interactive scenario wizard |
 
 ## Limitations
