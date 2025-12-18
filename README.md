@@ -154,7 +154,7 @@ jmeter-gen generate \
 **Azure DevOps example:**
 ```yaml
 - script: |
-    pip install jmeter-test-generator
+    pip install .  # run from jmeter-test-generator directory
     jmeter-gen generate \
       --spec $(SWAGGER_URL) \
       --scenario pipeline/loadtest/pt_scenario.yaml \
@@ -182,7 +182,6 @@ Both modes share the same core logic.
 ### Feature Documentation
 - [Scenario Specification](docs/PT_SCENARIO_SPEC.md) - pt_scenario.yaml format
 - [Scenario Cheatsheet](docs/PT_SCENARIO_CHEATSHEET.md) - Quick reference
-- [CI/CD Integration](docs/PIPELINE_INTEGRATION_PLAN.md) - Pipeline examples
 
 ### Developer Documentation
 - [Architecture](docs/dev/ARCHITECTURE.md)

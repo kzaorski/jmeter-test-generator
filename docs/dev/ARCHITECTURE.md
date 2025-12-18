@@ -738,7 +738,7 @@ class JMXValidationException(JMeterGenException):
 
 ### CLI Deployment
 ```bash
-pip install jmeter-test-generator
+pip install .  # from jmeter-test-generator directory
 jmeter-gen --version
 ```
 

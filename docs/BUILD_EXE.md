@@ -6,7 +6,7 @@ This guide explains how to build jmeter-gen as a standalone Windows executable u
 
 The standalone executable allows distribution of jmeter-gen without requiring Python installation on the target machine. The executable includes all dependencies and runs independently.
 
-**Note:** The standalone version excludes MCP Server functionality. For full features including MCP Server, install from PyPI: `pip install jmeter-test-generator`
+**Note:** The standalone version excludes MCP Server functionality. For full features including MCP Server, install from source: `pip install .` (from jmeter-test-generator directory)
 
 ## Prerequisites
 
